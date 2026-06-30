@@ -1,5 +1,5 @@
 //@version=6
-indicator("VANILLA AGENT — DERIV OPTIONS PROTOCOL", shorttitle="VANILLA AGENT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_polylines_count=100, max_bars_back=5000)
+indicator("VANILLA AGENT — DERIV OPTIONS PROTOCOL", shorttitle="VAN AGENT", overlay=true, max_lines_count=500, max_labels_count=500, max_boxes_count=500, max_polylines_count=100, max_bars_back=5000)
 
 // =========================================================================
 // VANILLA AGENT — DERIV OPTIONS PROTOCOL
@@ -122,6 +122,12 @@ vp_weight        = input.float(0.5, "Volume Profile Weight", minval=0, maxval=3.
 // --- 9. Vanilla Options Layer ---
 van_max_contracts  = input.int(3, "Max Contracts Per Side", minval=1, maxval=5, group=g_van,
      tooltip="Max vanilla contracts to track simultaneously in one direction")
+van_sniper_trail   = input.bool(true,  "Trail Flip = SNIPER Entry", group=g_van,
+     tooltip="Liquidity trail flip fires as a sniper CALL/PUT entry in the new direction — the purest entry signal")
+van_use_atm        = input.bool(true,  "ATM Bot Entries", group=g_van,
+     tooltip="Toggle ATM crossover entries on/off — disable to trade trail flips only")
+van_use_smart      = input.bool(true,  "Smart Scale-In Signals", group=g_van,
+     tooltip="Toggle RSI momentum scale-in signals on/off")
 van_show_strike    = input.bool(true, "Show Strike Line on Entry", group=g_van)
 van_show_duration  = input.bool(true, "Show Duration Label on Entry", group=g_van)
 van_show_exit      = input.bool(true, "Show Regime Shift Exit Signals", group=g_van)
@@ -852,13 +858,10 @@ bool gated_ATM_sell   = trig_ATM_sell   and trail_allows_short
 bool gated_smart_buy  = trig_smart_buy  and trail_allows_long
 bool gated_smart_sell = trig_smart_sell and trail_allows_short
 
-final_ATM_buy    = gated_ATM_buy    and bull_conf_pass
-final_ATM_sell   = gated_ATM_sell   and bear_conf_pass
-final_smart_buy  = gated_smart_buy  and bull_conf_pass
-final_smart_sell = gated_smart_sell and bear_conf_pass
-
-final_long  = final_ATM_buy  or final_smart_buy
-final_short = final_ATM_sell or final_smart_sell
+final_ATM_buy    = gated_ATM_buy    and bull_conf_pass and van_use_atm
+final_ATM_sell   = gated_ATM_sell   and bear_conf_pass and van_use_atm
+final_smart_buy  = gated_smart_buy  and bull_conf_pass and van_use_smart
+final_smart_sell = gated_smart_sell and bear_conf_pass and van_use_smart
 
 rejected_ATM_buy    = trig_ATM_buy    and not trail_allows_long
 rejected_ATM_sell   = trig_ATM_sell   and not trail_allows_short
@@ -877,6 +880,13 @@ else if final_short and posState >= 0
 
 bool flip_bull = ltf_trend == 1  and ltf_trend[1] == -1
 bool flip_bear = ltf_trend == -1 and ltf_trend[1] == 1
+
+// Sniper entries — trail flip is the directional truth; fires in new direction
+bool final_sniper_call = flip_bull and van_sniper_trail and bull_conf_pass
+bool final_sniper_put  = flip_bear and van_sniper_trail and bear_conf_pass
+
+final_long  = final_ATM_buy  or final_smart_buy  or final_sniper_call
+final_short = final_ATM_sell or final_smart_sell or final_sniper_put
 
 // =========================================================================
 // STEP 13: VANILLA OPTIONS LAYER
@@ -905,15 +915,22 @@ if final_ATM_sell and open_puts == 0
 else if final_smart_sell and open_puts > 0 and open_puts < van_max_contracts
     open_puts := open_puts + 1
 
+// Regime reset — trail flip clears old contracts first
 if flip_bull or flip_bear
     open_calls := 0
     open_puts  := 0
+
+// Sniper fires immediately after reset, opening 1 contract in new direction
+if final_sniper_call
+    open_calls := 1
+if final_sniper_put
+    open_puts  := 1
 
 bool in_calls = open_calls > 0
 bool in_puts  = open_puts  > 0
 
 // Duration suggestion — how long to buy the contract for, per chart timeframe
-_tfsecs = timeframe.in_seconds()
+int _tfsecs = timeframe.in_seconds(timeframe.period)
 string van_duration =
      _tfsecs <= 30    ? "1 - 5 min"   :
      _tfsecs <= 60    ? "5 - 15 min"  :
@@ -964,15 +981,19 @@ plotshape(flip_bull ? ltf_trail : na, "CALL Zone Start ", shape.diamond, locatio
 plotshape(flip_bear ? ltf_trail : na, "PUT Zone Start",  shape.diamond, location.absolute, color.new(bear_color, 50), size=size.small)
 plotshape(flip_bear ? ltf_trail : na, "PUT Zone Start ", shape.diamond, location.absolute, bear_color, size=size.tiny)
 
-// Primary entries — renamed to CALL / PUT
+// Sniper entries — trail flip = purest entry, large triangle, highest priority visual
+plotshape(final_sniper_call, title="SNIPER CALL (Trail Flip)", style=shape.triangleup,   location=location.belowbar, color=bull_color, textcolor=color.white, size=size.large, text="CALL\nSNIPER")
+plotshape(final_sniper_put,  title="SNIPER PUT (Trail Flip)",  style=shape.triangledown, location=location.abovebar, color=bear_color, textcolor=color.white, size=size.large, text="PUT\nSNIPER")
+
+// Primary entries — ATM bot trigger (togglable)
 plotshape(final_ATM_buy,  title="BUY CALL (Primary)", style=shape.labelup,   location=location.belowbar, color=bull_color, textcolor=color.white, size=size.normal, text="CALL\n PRIMARY")
 plotshape(final_ATM_sell, title="BUY PUT (Primary)",  style=shape.labeldown, location=location.abovebar, color=bear_color, textcolor=color.white, size=size.normal, text="PUT\n PRIMARY")
 
-// Scale-in signals — renamed to ADD CALL / ADD PUT
+// Scale-in signals — RSI momentum (togglable)
 plotshape(final_smart_buy,  title="ADD CALL (Scale-In)", style=shape.labelup,   location=location.belowbar, color=color.new(bull_color, 35), textcolor=color.white, size=size.small, text="CALL\n + ADD")
 plotshape(final_smart_sell, title="ADD PUT (Scale-In)",  style=shape.labeldown, location=location.abovebar, color=color.new(bear_color, 35), textcolor=color.white, size=size.small, text="PUT\n + ADD")
 
-// Regime shift exit signals (new)
+// Regime shift exit signals
 plotshape(van_exit_calls, title="EXIT CALLs (Regime Shift)", style=shape.xcross, location=location.belowbar, color=color.orange, size=size.normal, text="EXIT\nCALLs")
 plotshape(van_exit_puts,  title="EXIT PUTs (Regime Shift)",  style=shape.xcross, location=location.abovebar, color=color.orange, size=size.normal, text="EXIT\nPUTs")
 
@@ -1227,15 +1248,15 @@ if dashOn and not na(dashTable)
     table.cell(dashTable, 0, 23, " EXECUTION ", text_color=txt_title, text_size=size.small, bgcolor=bg_section, text_halign=text.align_left)
 
     table.cell(dashTable, 0, 24, " TRIGGER ", text_color=txt_label, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_left)
-    string trig_label = trig_ATM_buy ? "ATM — BUY CALL" : trig_smart_buy ? "SMART — ADD CALL" : trig_ATM_sell ? "ATM — BUY PUT" : trig_smart_sell ? "SMART — ADD PUT" : "WAIT"
-    color  trig_color = trig_ATM_buy or trig_smart_buy ? txt_bull : trig_ATM_sell or trig_smart_sell ? txt_bear : txt_neut
+    string trig_label = final_sniper_call ? "SNIPER — CALL ENTRY" : final_sniper_put ? "SNIPER — PUT ENTRY" : trig_ATM_buy ? "ATM — BUY CALL" : trig_smart_buy ? "SMART — ADD CALL" : trig_ATM_sell ? "ATM — BUY PUT" : trig_smart_sell ? "SMART — ADD PUT" : "WAIT"
+    color  trig_color = final_sniper_call ? txt_bull : final_sniper_put ? txt_bear : trig_ATM_buy or trig_smart_buy ? txt_bull : trig_ATM_sell or trig_smart_sell ? txt_bear : txt_neut
     table.cell(dashTable, 1, 24, trig_label, text_color=trig_color, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
     table.cell(dashTable, 2, 24, "DIR", text_color=color.new(color.gray, 50), text_size=size.tiny, bgcolor=bg_panel, text_halign=text.align_center)
     table.cell(dashTable, 3, 24, trail_allows_long ? "CALL" : trail_allows_short ? "PUT" : "—", text_color=trail_allows_long ? gate_pass : trail_allows_short ? gate_fail : txt_neut, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
 
     table.cell(dashTable, 0, 25, " CONF GATE ", text_color=txt_label, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_left)
     table.merge_cells(dashTable, 1, 25, 3, 25)
-    string conf_label = final_ATM_buy ? "BUY CALL PRIMARY" : final_ATM_sell ? "BUY PUT PRIMARY" : final_smart_buy ? "ADD CALL SCALE-IN" : final_smart_sell ? "ADD PUT SCALE-IN" : (bull_conf_pass or bear_conf_pass) ? "CONF OK — WAIT TRIGGER" : "LOW CONF — WAIT"
+    string conf_label = final_sniper_call ? "SNIPER CALL — TRAIL ENTRY" : final_sniper_put ? "SNIPER PUT — TRAIL ENTRY" : final_ATM_buy ? "BUY CALL PRIMARY" : final_ATM_sell ? "BUY PUT PRIMARY" : final_smart_buy ? "ADD CALL SCALE-IN" : final_smart_sell ? "ADD PUT SCALE-IN" : (bull_conf_pass or bear_conf_pass) ? "CONF OK; NO TRIG" : "LOW CONF — WAIT"
     color  conf_color = final_long ? txt_bull : final_short ? txt_bear : gate_warn
     table.cell(dashTable, 1, 25, conf_label, text_color=conf_color, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
 
@@ -1278,12 +1299,14 @@ alertcondition(final_ATM_buy,    title="BUY CALL — Primary Entry",  message="V
 alertcondition(final_ATM_sell,   title="BUY PUT  — Primary Entry",  message="VANILLA AGENT | BUY PUT (PRIMARY) | {{ticker}} | ATM Bot + Trail BEARISH + Confidence passed")
 alertcondition(final_smart_buy,  title="ADD CALL — Scale-In",       message="VANILLA AGENT | ADD CALL (SCALE-IN) | {{ticker}} | Smart Bull + Trail BULLISH + Confidence passed")
 alertcondition(final_smart_sell, title="ADD PUT  — Scale-In",       message="VANILLA AGENT | ADD PUT (SCALE-IN) | {{ticker}} | Smart Bear + Trail BEARISH + Confidence passed")
-alertcondition(van_exit_calls,   title="EXIT CALLS — Regime Shift", message="VANILLA AGENT | EXIT CALLS | {{ticker}} | Trail flipped BEARISH — stop buying CALLs, consider early exit on Deriv")
-alertcondition(van_exit_puts,    title="EXIT PUTS  — Regime Shift", message="VANILLA AGENT | EXIT PUTS | {{ticker}} | Trail flipped BULLISH — stop buying PUTs, consider early exit on Deriv")
+alertcondition(final_sniper_call, title="SNIPER CALL — Trail Entry",   message="VANILLA AGENT | SNIPER CALL | {{ticker}} | Trail flipped BULLISH — buy CALL now, sniper entry")
+alertcondition(final_sniper_put,  title="SNIPER PUT  — Trail Entry",   message="VANILLA AGENT | SNIPER PUT | {{ticker}} | Trail flipped BEARISH — buy PUT now, sniper entry")
+alertcondition(van_exit_calls,    title="EXIT CALLS — Regime Shift",   message="VANILLA AGENT | EXIT CALLS | {{ticker}} | Trail flipped BEARISH — close CALLs on Deriv")
+alertcondition(van_exit_puts,     title="EXIT PUTS  — Regime Shift",   message="VANILLA AGENT | EXIT PUTS | {{ticker}} | Trail flipped BULLISH — close PUTs on Deriv")
 alertcondition(any_rejected_long,  title="CALL Rejected", message="VANILLA AGENT | CALL BLOCKED | {{ticker}} | Signal rejected — trail or confidence gate failed")
 alertcondition(any_rejected_short, title="PUT Rejected",  message="VANILLA AGENT | PUT BLOCKED  | {{ticker}} | Signal rejected — trail or confidence gate failed")
 alertcondition(bullBOS, title="Bullish BOS", message="VANILLA AGENT | BULLISH BOS | {{ticker}}")
 alertcondition(bearBOS, title="Bearish BOS", message="VANILLA AGENT | BEARISH BOS | {{ticker}}")
 alertcondition(bull_conf_pass and not bull_conf_pass[1], title="CALL Confidence Passed", message="VANILLA AGENT | CALL CONF PASSED | {{ticker}} | Waiting for ATM trigger")
 alertcondition(bear_conf_pass and not bear_conf_pass[1], title="PUT Confidence Passed",  message="VANILLA AGENT | PUT CONF PASSED  | {{ticker}} | Waiting for ATM trigger")
-alertcondition(final_long or final_short or van_exit_calls or van_exit_puts, title="ALL Vanilla Signals", message="VANILLA AGENT | Signal fired on {{ticker}} — check chart for CALL/PUT/EXIT")
+alertcondition(final_long or final_short or van_exit_calls or van_exit_puts or final_sniper_call or final_sniper_put, title="ALL Vanilla Signals", message="VANILLA AGENT | Signal fired on {{ticker}} — check chart for SNIPER/CALL/PUT/EXIT")
