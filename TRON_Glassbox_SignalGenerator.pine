@@ -934,8 +934,17 @@ bool flip_bear = ltf_trend == -1 and ltf_trend[1] == 1
 // Regime-shift detection — "if you are holding a long-side position,
 // here's why you might want to exit it." Pine does not know if a
 // position exists; it only reports the regime condition firing.
-bool bearish_regime_shift = (exit_on_trail and flip_bear) or (exit_on_vwap and vwapBearish) or (exit_on_fib and fibBearish) or (exit_on_struct and bearBOS)
-bool bullish_regime_shift = (exit_on_trail and flip_bull) or (exit_on_vwap and vwapBullish) or (exit_on_fib and fibBullish) or (exit_on_struct and bullBOS)
+// Regime-shift = edge events only. flip_bear/flip_bull and BOS are already
+// single-bar pulses. VWAP and Fib are persistent states so we fire only on
+// the bar they flip (and not X[1]) — otherwise every trend bar spams a label.
+bool bearish_regime_shift = (exit_on_trail and flip_bear) or
+     (exit_on_vwap and vwapBearish and not vwapBearish[1]) or
+     (exit_on_fib  and fibBearish  and not fibBearish[1])  or
+     (exit_on_struct and bearBOS)
+bool bullish_regime_shift = (exit_on_trail and flip_bull) or
+     (exit_on_vwap and vwapBullish and not vwapBullish[1]) or
+     (exit_on_fib  and fibBullish  and not fibBullish[1])  or
+     (exit_on_struct and bullBOS)
 
 // =========================================================================
 // STEP 14: VISUAL OUTPUTS (VANILLA-SPECIFIC)
