@@ -1268,6 +1268,10 @@ if barstate.islast and showLongevity
             lbl = label.new(lx, ly, txt, style=label.style_label_center, textcolor=color.white, color=color.new(color.black, 0))
             array.push(lowerDraw, drawing.new(ln1, ln2, f, lbl))
 
+// Helper function used by both Dashboard (STEP 16) and Alerts (STEP 17)
+trendLabel(int t) =>
+    t == 1 ? "BULL" : t == -1 ? "BEAR" : "NEUT"
+
 // =========================================================================
 // STEP 16: COGNITIVE DASHBOARD (VANILLA-SPECIFIC)
 // =========================================================================
@@ -1536,9 +1540,6 @@ else if not dashOn and not na(dashTable)
 // no webhook parser needed. Pine carries the full architecture state so
 // Jarvis can reconstruct context from the message alone.
 // =========================================================================
-
-trendLabel(int t) =>
-    t == 1 ? "BULL" : t == -1 ? "BEAR" : "NEUT"
 
 tronAlert(string sigType, string bias, float confPct) =>
     bool is_rf      = trade_mode == "Rise/Fall"
