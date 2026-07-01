@@ -947,22 +947,6 @@ float put_d1        = (math.log(close / math.max(put_strike,  syminfo.mintick)) 
 float call_delta    = math.max(0.01, math.min(0.99, 0.5 + 0.4 * call_d1))
 float put_delta     = math.max(0.01, math.min(0.99, 0.5 - 0.4 * put_d1))
 
-// Hypothetical PnL tracker — shows what last confirmed signal would be worth now
-// Pine can't know actual premium paid, so we proxy: premium ≈ delta × strike × IV × sqrt(T)
-var float last_entry_price = na
-var string last_entry_bias = ""
-if final_call_entry
-    last_entry_price := close
-    last_entry_bias  := "CALL"
-if final_put_entry
-    last_entry_price := close
-    last_entry_bias  := "PUT"
-
-float pnl_pts = na
-if not na(last_entry_price)
-    pnl_pts := last_entry_bias == "CALL" ? close - last_entry_price : last_entry_bias == "PUT" ? last_entry_price - close : na
-string pnl_label = na(pnl_pts) ? "—" : (pnl_pts >= 0 ? "+" : "") + str.tostring(pnl_pts, "#.##") + " pts (" + (pnl_pts >= 0 ? "WIN" : "LOSS") + ")"
-
 // =========================================================================
 // STEP 13: STATELESS SIGNAL DETECTION (no position tracking — Brain's job)
 // =========================================================================
@@ -1035,6 +1019,18 @@ float put_sl   = close + current_atr * rr_sl_mult
 float put_tp1  = close - current_atr * rr_tp_mult
 float put_tp2  = close - current_atr * rr_tp_mult * 2.0
 float put_tp3  = close - current_atr * rr_tp_mult * 3.5
+
+// PnL tracker — must live after final_call/put_entry are declared
+var float last_entry_price = na
+var string last_entry_bias = ""
+if final_call_entry
+    last_entry_price := close
+    last_entry_bias  := "CALL"
+if final_put_entry
+    last_entry_price := close
+    last_entry_bias  := "PUT"
+float pnl_pts = na(last_entry_price) ? na : last_entry_bias == "CALL" ? close - last_entry_price : last_entry_price - close
+string pnl_label = na(pnl_pts) ? "—" : (pnl_pts >= 0 ? "+" : "") + str.tostring(pnl_pts, "#.##") + " pts (" + (pnl_pts >= 0 ? "WIN" : "LOSS") + ")"
 
 // =========================================================================
 // STEP 14: VISUAL OUTPUTS (VANILLA-SPECIFIC)
