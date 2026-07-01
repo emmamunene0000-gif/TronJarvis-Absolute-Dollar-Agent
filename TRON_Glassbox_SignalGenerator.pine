@@ -1001,14 +1001,26 @@ bool flip_bull = ltf_trend == 1  and ltf_trend[1] == -1
 bool flip_bear = ltf_trend == -1 and ltf_trend[1] == 1
 
 // Regime shifts — edge-only (no persistent-state spam)
+// Zone breaks included: support lost = bearish regime, resistance broken = bullish regime
 bool bearish_regime_shift = (exit_on_trail and flip_bear) or
      (exit_on_vwap and vwapBearish and not vwapBearish[1]) or
      (exit_on_fib  and fibBearish  and not fibBearish[1])  or
-     (exit_on_struct and bearBOS)
+     (exit_on_struct and bearBOS)                          or
+     (show_zones and bear_break_signal)
 bool bullish_regime_shift = (exit_on_trail and flip_bull) or
      (exit_on_vwap and vwapBullish and not vwapBullish[1]) or
      (exit_on_fib  and fibBullish  and not fibBullish[1])  or
-     (exit_on_struct and bullBOS)
+     (exit_on_struct and bullBOS)                          or
+     (show_zones and bull_break_signal)
+
+// Liquidity Zone Sniper Entries — zone retest = price returning to broken level = institutional confirmation
+// These are the highest-conviction entries in the system. Trail + confidence must agree.
+bool liq_call_entry = show_zones and bull_retest_signal and trail_allows_long  and bull_conf_pass
+bool liq_put_entry  = show_zones and bear_retest_signal and trail_allows_short and bear_conf_pass
+
+// Zone Break Momentum — structural break with trail in same direction (continuation type)
+bool liq_call_break = show_zones and bull_break_signal and trail_allows_long
+bool liq_put_break  = show_zones and bear_break_signal and trail_allows_short
 
 // Risk-aware SL / TP (ATR RR model — asset-agnostic, CFD/Vanilla/Futures)
 float call_sl  = close - current_atr * rr_sl_mult
@@ -1066,6 +1078,19 @@ if bearish_regime_shift
     label.new(bar_index, high, "BEARISH REGIME SHIFT", color=color.orange, textcolor=color.white, style=label.style_label_down, size=size.small)
 if bullish_regime_shift
     label.new(bar_index, low, "BULLISH REGIME SHIFT", color=color.orange, textcolor=color.white, style=label.style_label_up, size=size.small)
+
+// Liquidity Zone Sniper Entries — gold labels, highest conviction entries in the system
+// Price has returned to a broken level — institutions defend that level, edge is highest here
+if liq_call_entry
+    label.new(bar_index, low,  "SNIPER CALL\nStrike: " + str.tostring(call_strike, "#.##") + "\nExpiry: " + str.tostring(rec_expiry) + "m", color=color.new(color.yellow, 0), textcolor=color.black, style=label.style_label_up, size=size.small)
+if liq_put_entry
+    label.new(bar_index, high, "SNIPER PUT\nStrike: " + str.tostring(put_strike, "#.##") + "\nExpiry: " + str.tostring(rec_expiry) + "m", color=color.new(color.yellow, 0), textcolor=color.black, style=label.style_label_down, size=size.small)
+
+// Zone Break Momentum — structural break labels (lighter, continuation type)
+if liq_call_break and not liq_call_entry
+    label.new(bar_index, low,  "BREAK CALL", color=color.new(color.teal, 20), textcolor=color.white, style=label.style_label_up, size=size.tiny)
+if liq_put_break and not liq_put_entry
+    label.new(bar_index, high, "BREAK PUT",  color=color.new(color.maroon, 20), textcolor=color.white, style=label.style_label_down, size=size.tiny)
 
 // Live strike levels — always-on detection, not gated on a held position
 plot(show_strikes and trail_allows_long ? call_strike : na, "Call Strike (live)", color=color.new(bull_color, 50), style=plot.style_linebr, linewidth=2)
@@ -1197,7 +1222,7 @@ color gate_fail  = color.new(#ff0000, 20)
 color gate_warn  = color.new(#ffaa00, 20)
 
 string sys_bias    = ltf_trend == 1 ? "BULLISH" : ltf_trend == -1 ? "BEARISH" : "NEUTRAL"
-string sys_action  = final_call_entry ? "CALL SIGNAL" : final_put_entry ? "PUT SIGNAL" : continuation_call ? "CALL CONT." : continuation_put ? "PUT CONT." : "DETECTING"
+string sys_action  = liq_call_entry ? "SNIPER CALL" : liq_put_entry ? "SNIPER PUT" : final_call_entry ? "CALL SIGNAL" : final_put_entry ? "PUT SIGNAL" : liq_call_break ? "BREAK CALL" : liq_put_break ? "BREAK PUT" : continuation_call ? "CALL CONT." : continuation_put ? "PUT CONT." : "DETECTING"
 float  sys_conf    = ltf_trend == 1 ? bull_conf_pct : ltf_trend == -1 ? bear_conf_pct : 0.0
 string sys_waiting = ltf_trend == 1 ? (bull_conf_pass ? "ATM Trigger" : "Conf " + str.tostring(math.round(bull_conf_pct)) + "%->" + str.tostring(conf_threshold) + "%") : ltf_trend == -1 ? (bear_conf_pass ? "ATM Trigger" : "Conf " + str.tostring(math.round(bear_conf_pct)) + "%->" + str.tostring(conf_threshold) + "%") : "Trail Direction"
 string sys_flip_req = ltf_trend == 1 ? "Trail flip -> bearish" : ltf_trend == -1 ? "Trail flip -> bullish" : "Any trail confirmation"
@@ -1206,7 +1231,7 @@ float bull_mtf_pts = mtf_bull_conf ? mtf_weight : mtf_partial_bull ? mtf_weight 
 float bear_mtf_pts = mtf_bear_conf ? mtf_weight : mtf_partial_bear ? mtf_weight * 0.4 : 0.0
 
 if dashOn and (na(dashTable) or panelPlacement != prevPlace)
-    dashTable := table.new(pos_enum, 4, 36, border_width=1, border_color=color.new(color.gray, 70), frame_width=1, frame_color=color.new(color.gray, 70))
+    dashTable := table.new(pos_enum, 4, 40, border_width=1, border_color=color.new(color.gray, 70), frame_width=1, frame_color=color.new(color.gray, 70))
     prevPlace := panelPlacement
 
 if dashOn and not na(dashTable)
@@ -1372,8 +1397,28 @@ if dashOn and not na(dashTable)
     color pnl_color = na(pnl_pts) ? txt_neut : pnl_pts >= 0 ? gate_pass : gate_fail
     table.cell(dashTable, 1, 35, pnl_label + (na(last_entry_bias) ? "" : "  [" + last_entry_bias + "]"), text_color=pnl_color, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
 
+    table.merge_cells(dashTable, 0, 36, 3, 36)
+    table.cell(dashTable, 0, 36, " LIQUIDITY ZONES (Sniper Engine) ", text_color=color.new(color.yellow, 10), text_size=size.small, bgcolor=color.new(#2a2e39, 30), text_halign=text.align_left)
+
+    table.cell(dashTable, 0, 37, " SNIPER ", text_color=txt_label, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_left)
+    table.merge_cells(dashTable, 1, 37, 3, 37)
+    string sniper_txt = liq_call_entry ? "SNIPER CALL  — Zone retest confirmed" : liq_put_entry ? "SNIPER PUT   — Zone retest confirmed" : show_zones ? "Watching for zone retest..." : "Enable Liquidity Zones to activate"
+    color  sniper_col = liq_call_entry ? txt_bull : liq_put_entry ? txt_bear : txt_neut
+    table.cell(dashTable, 1, 37, sniper_txt, text_color=sniper_col, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
+
+    table.cell(dashTable, 0, 38, " BREAK ", text_color=txt_label, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_left)
+    table.merge_cells(dashTable, 1, 38, 3, 38)
+    string break_txt = liq_call_break ? "BULL BREAK  — Resistance taken, momentum" : liq_put_break ? "BEAR BREAK  — Support lost, momentum" : show_zones ? "No zone break this bar" : "—"
+    color  break_col = liq_call_break ? txt_bull : liq_put_break ? txt_bear : txt_neut
+    table.cell(dashTable, 1, 38, break_txt, text_color=break_col, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
+
+    table.cell(dashTable, 0, 39, " ZONES ", text_color=txt_label, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_left)
+    table.merge_cells(dashTable, 1, 39, 3, 39)
+    string zones_txt = show_zones ? (str.tostring(zones.size()) + " active zones  •  Bull: " + (bull_break_signal ? "BRK" : bull_retest_signal ? "RET" : "—") + "  Bear: " + (bear_break_signal ? "BRK" : bear_retest_signal ? "RET" : "—")) : "OFF — Enable in section 2"
+    table.cell(dashTable, 1, 39, zones_txt, text_color=txt_neut, text_size=size.small, bgcolor=bg_panel, text_halign=text.align_center)
+
 else if not dashOn and not na(dashTable)
-    table.clear(dashTable, 0, 0, 3, 35)
+    table.clear(dashTable, 0, 0, 3, 39)
     dashTable := na
     prevPlace := ""
 
@@ -1447,6 +1492,18 @@ if bullBOS
 if bearBOS
     alert(tronAlert("🏗 BEARISH BOS", "PUT", bear_conf_pct), alert.freq_once_per_bar_close)
 
+// Liquidity Zone alerts — Sniper entries and Break momentum
+// Sniper = zone retest (highest conviction — price returning to broken level)
+// Break  = structural break with trail alignment (momentum confirmation)
+if liq_call_entry
+    alert(tronAlert("⚡ SNIPER CALL — Zone Retest", "CALL", bull_conf_pct), alert.freq_once_per_bar_close)
+if liq_put_entry
+    alert(tronAlert("⚡ SNIPER PUT — Zone Retest",  "PUT",  bear_conf_pct), alert.freq_once_per_bar_close)
+if liq_call_break
+    alert(tronAlert("⚡ CALL BREAK — Zone Momentum", "CALL", bull_conf_pct), alert.freq_once_per_bar_close)
+if liq_put_break
+    alert(tronAlert("⚡ PUT BREAK — Zone Momentum",  "PUT",  bear_conf_pct), alert.freq_once_per_bar_close)
+
 // Static alertcondition() entries kept for TradingView's Alert dialog dropdown
 alertcondition(final_call_entry,    title="Vanilla Call Entry",      message="TRON GLASSBOX: CALL ENTRY")
 alertcondition(final_put_entry,     title="Vanilla Put Entry",       message="TRON GLASSBOX: PUT ENTRY")
@@ -1458,3 +1515,7 @@ alertcondition(bull_conf_pass and not bull_conf_pass[1], title="Call Confidence 
 alertcondition(bear_conf_pass and not bear_conf_pass[1], title="Put Confidence Pass",  message="TRON GLASSBOX: PUT CONFIDENCE THRESHOLD MET")
 alertcondition(bullBOS,             title="Bullish BOS",             message="TRON GLASSBOX: BULLISH BREAK OF STRUCTURE")
 alertcondition(bearBOS,             title="Bearish BOS",             message="TRON GLASSBOX: BEARISH BREAK OF STRUCTURE")
+alertcondition(liq_call_entry,      title="Sniper Call Entry",       message="TRON GLASSBOX: SNIPER CALL — Zone Retest")
+alertcondition(liq_put_entry,       title="Sniper Put Entry",        message="TRON GLASSBOX: SNIPER PUT — Zone Retest")
+alertcondition(liq_call_break,      title="Call Zone Break",         message="TRON GLASSBOX: CALL BREAK — Zone Momentum")
+alertcondition(liq_put_break,       title="Put Zone Break",          message="TRON GLASSBOX: PUT BREAK — Zone Momentum")
