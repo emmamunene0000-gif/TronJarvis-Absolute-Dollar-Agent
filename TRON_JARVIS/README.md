@@ -441,25 +441,28 @@ Alert format changes to:
 
 ## Project Files
 
+Repo root — not nested under this folder:
+
 ```
+TRON_Glassbox_SignalGenerator.pine   ← TRON, ACTIVE v4.0 — the only Pine Script in this repo
+                                        STEP 17 emits JSON (engine=TRON_GBX_v3) into the
+                                        Jarvis webhook — no other alert path exists.
+
+jarvis/                              ← JARVIS — ADI Execution Twin (Phase 1, built)
+├── README.md                        ← setup: server, .env, TradingView alert wiring
+├── requirements.txt
+├── .env.example
+└── app/
+    ├── main.py                      ← FastAPI spine — POST /webhook/tron, GET /ledger/*
+    ├── parser.py                    ← validates TRON JSON, classifies EXECUTE/CONTEXT/NOISE
+    ├── governor.py                  ← risk constitution — stake/loss/concurrency/auto gates
+    ├── voice.py                     ← Jarvis's plain-text chain-logic language
+    ├── deriv.py                     ← one WS pipeline: vanilla / rise_fall / multiplier
+    ├── telegram_bot.py              ← tap-to-trade cards + broadcast copy
+    └── db.py                        ← SQLite ledger — signals, trades, governor log
+
 TRON_JARVIS/
-├── README.md                          ← you are here — full vision + masterclass
-│
-├── Pine Script (TRON)
-│   └── TRON_Glassbox_SignalGenerator.pine  ← ACTIVE v4.0 — the only Pine Script in this repo
-│
-├── Legacy / Reference
-│   ├── AgentProtocol_LiquiditySuite.mq5
-│   ├── Agent - Liquidity Suite.txt
-│   ├── Agent V7 Strategy - Tradesgnl.txt
-│   └── June TradeSgnl Syntax.txt
-│
-└── (coming) Jarvis/
-    ├── brain.py                       ← position ledger, episodic memory
-    ├── signal_engine.py               ← Tron-parity analysis (Deriv API)
-    ├── telegram_bot.py                ← briefing dispatch, tap-to-trade
-    ├── deriv_client.py                ← execution bridge (Rise/Fall + Vanilla)
-    └── config.yaml                    ← pairs, risk params, session filters
+└── README.md                        ← you are here — vision, signal hierarchy, operator masterclass
 ```
 
 ---
@@ -468,8 +471,9 @@ TRON_JARVIS/
 
 ```
 Analysis   → TRON sees it. Jarvis confirms it.
-Capital    → Deriv Vanilla Options (defined risk, no stop-hunt)
+Capital    → Deriv Vanilla Options (defined risk, no stop-hunt) — primary
              Deriv Rise/Fall (pure direction, scalp speed)
+             Deriv Multipliers (leveraged, no expiry — replaces perpetuals; Bybit shelved)
 Execution  → Human-in-loop now. Autonomous later.
 ```
 
@@ -491,12 +495,11 @@ Execution  → Human-in-loop now. Autonomous later.
 
 ## Build Sequence
 
-- [x] Phase 0 — Ground truth locked (`TRON_GroundTruth_Locked.pine`)
-- [x] Phase 1 — Glassbox signal generator (`TRON_Glassbox_SignalGenerator.pine`)
+- [x] Phase 0 — Glassbox signal generator (`TRON_Glassbox_SignalGenerator.pine`)
   - [x] Stateless — all position tracking removed
   - [x] 4-layer fractal sync (H4/H1/M15/M5)
   - [x] Edge-detected regime shifts (no spam)
-  - [x] Telegram-native formatted alerts (zero middleware)
+  - [x] JSON webhook emitter (`engine: TRON_GBX_v3`) — Jarvis is the only voice humans hear
   - [x] RR-based expiry formula (ATR velocity model, scalp-capped)
   - [x] Regime strength scoring + quality tiers (SOVEREIGN/ALIGNED/MIXED/OPPOSED)
   - [x] IV proxy + delta approximation
@@ -507,21 +510,28 @@ Execution  → Human-in-loop now. Autonomous later.
   - [x] **MTF Trail Flip Sniper entries** — chart/M15/H1/H4 flip signals, tiered by TF
   - [x] **SL/TP lines drawn on chart** — auto-drawn on every entry, persist until next entry
   - [x] **Rise/Fall mode** — alert format + dashboard adapts, no strike needed
-  - [x] 24 alertcondition() entries (full dropdown in TradingView)
   - [x] Cognitive dashboard (43 rows — full architecture state at a glance)
   - [x] Operator masterclass (this README — how to act on every alert type)
-- [ ] Phase 2 — Jarvis Brain (Python)
-  - [ ] Deriv API data feed
-  - [ ] Tron-parity signal engine
-  - [ ] Position ledger + episodic memory
-  - [ ] Telegram bot + briefings
-  - [ ] LLM narrative generation (Claude API)
-  - [ ] Rise/Fall execution via Deriv API
-- [ ] Phase 3 — Execution
-  - [ ] Deriv API order execution (Vanilla + Rise/Fall)
-  - [ ] Human-in-loop tap-to-trade
-  - [ ] Risk gate (daily limits, session filters)
-- [ ] Phase 4 — Mini App
-  - [ ] Telegram mini app (tap-to-trade UI)
-  - [ ] Live dashboard (positions, P&L, signal history)
-  - [ ] Bybit perpetual futures (after Deriv mastery)
+- [x] Phase 1 — Jarvis Execution Twin (Python, `jarvis/`)
+  - [x] FastAPI webhook receiver + SQLite ledger (signals, trades, governor log)
+  - [x] Parser + tier classifier (EXECUTE / CONTEXT / NOISE)
+  - [x] Risk Governor — stake cap, daily loss cap, concurrency cap, auto-only whitelist + confidence floor
+  - [x] Jarvis's Voice — plain-text signal cards, receipts, refusals, boot banner
+  - [x] Deriv execution pipeline — vanilla / rise_fall / multiplier, one WS client
+  - [x] Telegram tap-to-trade (operator buttons + buttonless broadcast copy)
+  - [x] Demo/real hard switch (`DERIV_ENV`)
+  - [x] Auto-trader present but caged — off by default, whitelist + confidence-gated when on
+  - [ ] Deployed and soak-tested against Deriv demo (next: get it live on a VPS)
+- [ ] Phase 2 — Jarvis Brain, deepened
+  - [ ] Watchlist twin — TRON math re-derived server-side over Deriv candle streams (multi-asset scanning)
+  - [ ] LLM narrative generation (Claude API) — voice.py is deterministic templates today, not LLM-authored
+  - [ ] Episodic memory beyond the SQL ledger (pattern recall across sessions)
+  - [ ] Session filters in the Governor (time-of-day gating)
+- [ ] Phase 3 — Real money
+  - [ ] Confirm symbol map + demo ledger clean for ≥1 week
+  - [ ] Flip `DERIV_ENV=real`, same code path
+  - [ ] Auto-trader graduates from demo-only once its ledger earns it
+- [ ] Phase 4 — Commercial skin
+  - [ ] Telegram Mini App (tap-to-trade UI, ledger read API already exposed)
+  - [ ] Affiliate / Operator tiers for the Beta channel
+  - [ ] (Bybit is shelved — Deriv Multipliers cover the perpetuals use case, one broker only)
