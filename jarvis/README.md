@@ -19,7 +19,7 @@ Tier routing: EXECUTE signals get an operator card with ⚡ buttons and a broadc
    - **WEBHOOK_SECRET**: long random string.
 4. Run: `uvicorn app.main:app --host 0.0.0.0 --port 8080`
    (Production: put it behind Caddy/nginx for HTTPS — TradingView requires port 80/443 for webhooks.)
-5. **TradingView side**: paste `pine/tron_json_alerts.pine` into TRON (replacing the STEP 17 prose alerts), create ONE alert per chart with "Any alert() function call", Message = `{{alert_message}}`, Webhook URL = `https://your-host/webhook/tron?key=YOUR_SECRET`.
+5. **TradingView side**: `TRON_Glassbox_SignalGenerator.pine` (repo root) already emits JSON — STEP 17 was merged. Load it on the chart, create ONE alert with condition "Any alert() function call", Message = `{{alert_message}}`, Webhook URL = `https://your-host/webhook/tron?key=YOUR_SECRET`.
 
 ## Commands
 
