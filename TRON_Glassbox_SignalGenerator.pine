@@ -1547,58 +1547,20 @@ jstr(string s) =>
     str.replace_all(s, "\"", "'")
 
 tronJSON(string sigType, string bias, float confPct) =>
-    float  strike   = bias == "CALL" ? call_strike : put_strike
-    float  sl_v     = bias == "CALL" ? call_sl  : put_sl
-    float  tp1_v    = bias == "CALL" ? call_tp1 : put_tp1
-    float  tp2_v    = bias == "CALL" ? call_tp2 : put_tp2
-    float  tp3_v    = bias == "CALL" ? call_tp3 : put_tp3
-    float  delta_v  = bias == "CALL" ? call_delta : put_delta
-    string mode_key = trade_mode == "Vanilla Options" ? "vanilla" : trade_mode == "Rise/Fall" ? "rise_fall" : "multiplier"
-    "{" +
-      "\"engine\":\"TRON_GBX_v3\"," +
-      "\"schema\":1," +
-      "\"signal\":\""   + jstr(sigType) + "\"," +
-      "\"bias\":\""     + bias + "\"," +
-      "\"mode\":\""     + mode_key + "\"," +
-      "\"symbol\":\""   + jstr(syminfo.ticker) + "\"," +
-      "\"tf\":\""       + jstr(timeframe.period) + "\"," +
-      "\"time\":"       + str.tostring(timenow) + "," +
-      "\"spot\":"       + str.tostring(close, "#.#####") + "," +
-      "\"confidence\":" + str.tostring(math.round(confPct)) + "," +
-      "\"conf_bull\":"  + str.tostring(math.round(bull_conf_pct)) + "," +
-      "\"conf_bear\":"  + str.tostring(math.round(bear_conf_pct)) + "," +
-      "\"fractal\":{" +
-        "\"h4\":\""  + trendLabel(h4_trend)  + "\"," +
-        "\"h1\":\""  + trendLabel(h1_trend)  + "\"," +
-        "\"m15\":\"" + trendLabel(m15_trend) + "\"," +
-        "\"m5\":\""  + trendLabel(m5_trend)  + "\"," +
-        "\"sync_layers\":" + str.tostring(sync_layers) + "," +
-        "\"quality\":\""   + regime_quality + "\"" +
-      "}," +
-      "\"core\":{" +
-        "\"structure\":\"" + (bullBOS ? "BULL_BOS" : bearBOS ? "BEAR_BOS" : structLabel) + "\"," +
-        "\"vwap\":\""      + (vwapBullish ? "BULL" : vwapBearish ? "BEAR" : "NEUT") + "\"," +
-        "\"fib\":\""       + (fibBullish ? "BULL" : fibBearish ? "BEAR" : "NEUT") + "\"," +
-        "\"vp\":\""        + jstr(vp_strength) + "\"," +
-        "\"rsi\":"         + str.tostring(rsi, "#.#") + "," +
-        "\"spatial\":\""   + (spatial_quality ? "KEY_LEVEL" : "OPEN_SPACE") + "\"" +
-      "}," +
-      "\"setup\":{" +
-        "\"strike\":"      + str.tostring(strike, "#.#####") + "," +
-        "\"strike_mode\":\"" + strike_mode + "\"," +
-        "\"expiry_min\":"  + str.tostring(rec_expiry) + "," +
-        "\"sl\":"          + str.tostring(sl_v,  "#.#####") + "," +
-        "\"tp1\":"         + str.tostring(tp1_v, "#.#####") + "," +
-        "\"tp2\":"         + str.tostring(tp2_v, "#.#####") + "," +
-        "\"tp3\":"         + str.tostring(tp3_v, "#.#####") + "," +
-        "\"rr\":"          + str.tostring(rr_ratio, "#.##") + "," +
-        "\"atr\":"         + str.tostring(current_atr, "#.#####") + "," +
-        "\"iv_proxy\":"    + str.tostring(iv_proxy, "#.###") + "," +
-        "\"delta\":"       + str.tostring(delta_v, "#.##") + "," +
-        "\"regime_strength\":" + str.tostring(math.round(math.abs(regime_strength))) + "," +
-        "\"regime_bars\":" + str.tostring(regime_bar_count) +
-      "}" +
-    "}"
+    float  strike    = bias == "CALL" ? call_strike : put_strike
+    float  sl_v      = bias == "CALL" ? call_sl  : put_sl
+    float  tp1_v     = bias == "CALL" ? call_tp1 : put_tp1
+    float  tp2_v     = bias == "CALL" ? call_tp2 : put_tp2
+    float  tp3_v     = bias == "CALL" ? call_tp3 : put_tp3
+    float  delta_v   = bias == "CALL" ? call_delta : put_delta
+    string mode_key  = trade_mode == "Vanilla Options" ? "vanilla" : trade_mode == "Rise/Fall" ? "rise_fall" : "multiplier"
+    string j_head    = "{\"engine\":\"TRON_GBX_v3\",\"schema\":1,\"signal\":\"" + jstr(sigType) + "\",\"bias\":\"" + bias + "\",\"mode\":\"" + mode_key + "\","
+    string j_meta    = "\"symbol\":\"" + jstr(syminfo.ticker) + "\",\"tf\":\"" + jstr(timeframe.period) + "\",\"time\":" + str.tostring(timenow) + ",\"spot\":" + str.tostring(close, "#.#####") + ","
+    string j_conf    = "\"confidence\":" + str.tostring(math.round(confPct)) + ",\"conf_bull\":" + str.tostring(math.round(bull_conf_pct)) + ",\"conf_bear\":" + str.tostring(math.round(bear_conf_pct)) + ","
+    string j_fractal = "\"fractal\":{\"h4\":\"" + trendLabel(h4_trend) + "\",\"h1\":\"" + trendLabel(h1_trend) + "\",\"m15\":\"" + trendLabel(m15_trend) + "\",\"m5\":\"" + trendLabel(m5_trend) + "\",\"sync_layers\":" + str.tostring(sync_layers) + ",\"quality\":\"" + regime_quality + "\"},"
+    string j_core    = "\"core\":{\"structure\":\"" + (bullBOS ? "BULL_BOS" : bearBOS ? "BEAR_BOS" : structLabel) + "\",\"vwap\":\"" + (vwapBullish ? "BULL" : vwapBearish ? "BEAR" : "NEUT") + "\",\"fib\":\"" + (fibBullish ? "BULL" : fibBearish ? "BEAR" : "NEUT") + "\",\"vp\":\"" + jstr(vp_strength) + "\",\"rsi\":" + str.tostring(rsi, "#.#") + ",\"spatial\":\"" + (spatial_quality ? "KEY_LEVEL" : "OPEN_SPACE") + "\"},"
+    string j_setup   = "\"setup\":{\"strike\":" + str.tostring(strike, "#.#####") + ",\"strike_mode\":\"" + strike_mode + "\",\"expiry_min\":" + str.tostring(rec_expiry) + ",\"sl\":" + str.tostring(sl_v, "#.#####") + ",\"tp1\":" + str.tostring(tp1_v, "#.#####") + ",\"tp2\":" + str.tostring(tp2_v, "#.#####") + ",\"tp3\":" + str.tostring(tp3_v, "#.#####") + ",\"rr\":" + str.tostring(rr_ratio, "#.##") + ",\"atr\":" + str.tostring(current_atr, "#.#####") + ",\"iv_proxy\":" + str.tostring(iv_proxy, "#.###") + ",\"delta\":" + str.tostring(delta_v, "#.##") + ",\"regime_strength\":" + str.tostring(math.round(math.abs(regime_strength))) + ",\"regime_bars\":" + str.tostring(regime_bar_count) + "}}"
+    j_head + j_meta + j_conf + j_fractal + j_core + j_setup
 
 if final_call_entry
     alert(tronJSON("CALL_ENTRY", "CALL", bull_conf_pct), alert.freq_once_per_bar_close)
