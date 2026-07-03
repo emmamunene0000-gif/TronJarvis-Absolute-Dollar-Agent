@@ -75,7 +75,7 @@ class DerivClient:
 
         params: dict = {
             "contract_type": ct,
-            "symbol": symbol,
+            "underlying_symbol": symbol,
             "amount": round(stake, 2),
         }
 
