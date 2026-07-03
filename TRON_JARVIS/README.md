@@ -517,11 +517,17 @@ Execution  → Human-in-loop now. Autonomous later.
   - [x] Parser + tier classifier (EXECUTE / CONTEXT / NOISE)
   - [x] Risk Governor — stake cap, daily loss cap, concurrency cap, auto-only whitelist + confidence floor
   - [x] Jarvis's Voice — plain-text signal cards, receipts, refusals, boot banner
-  - [x] Deriv execution pipeline — vanilla / rise_fall / multiplier, one WS client
+  - [x] Deriv execution pipeline — vanilla / rise_fall / multiplier, Bulk Purchase REST fast path
   - [x] Telegram tap-to-trade (operator buttons + buttonless broadcast copy)
   - [x] Demo/real hard switch (`DERIV_ENV`)
   - [x] Auto-trader present but caged — off by default, whitelist + confidence-gated when on
-  - [ ] Deployed and soak-tested against Deriv demo (next: get it live on a VPS)
+  - [x] Deployed to Replit (Reserved VM), first successful buy pending live test
+- [ ] Phase 1.5 — Deriv OAuth2 + PKCE (full API parity)
+  - **Why this exists:** Deriv retired the legacy WebSocket API for migrated accounts (confirmed via `GET /trading/v1/options/legacy/migration-status` → `"complete"`). Every `pat_` token failed `InvalidToken` against the old `wss://ws.derivws.com` endpoint regardless of app_id — that endpoint is simply gone for this account. The new API's single-account flow needs an interactive OAuth2 Authorization Code + PKCE login (`auth.deriv.com`) to get an access token, then a REST call for an OTP, then a WS URL. Personal Access Tokens still work, but only against the **Bulk Purchase** endpoint (direct buy, no quote, no balance, no status polling) — that's the fast path Phase 1 ships with today.
+  - [ ] PKCE login flow + `/oauth/callback` route in `main.py` (redirect_uri already registered on the Deriv app)
+  - [ ] Token storage + refresh (`expires_in` was 3600s in testing — confirm whether a `refresh_token` is issued)
+  - [ ] Swap `deriv.py` back to the OTP-authenticated WS flow: `proposal` (live quote) → `buy` → `proposal_open_contract` (settlement watching, restores WIN/LOSS receipts)
+  - [ ] `balance`/`portfolio` calls for real account-state checks on boot and `/status`
 - [ ] Phase 2 — Jarvis Brain, deepened
   - [ ] Watchlist twin — TRON math re-derived server-side over Deriv candle streams (multi-asset scanning)
   - [ ] LLM narrative generation (Claude API) — voice.py is deterministic templates today, not LLM-authored

@@ -23,12 +23,22 @@ TELEGRAM_OPERATOR_ID = int(os.getenv("TELEGRAM_OPERATOR_ID", "0"))
 TELEGRAM_BROADCAST_ID = os.getenv("TELEGRAM_BROADCAST_ID", "")
 
 # --- Deriv ---
-DERIV_APP_ID = os.getenv("DERIV_APP_ID", "1089")  # register your own app id
+# NOTE: Deriv retired the legacy WebSocket API (wss://ws.derivws.com) for
+# migrated accounts — confirmed via GET /trading/v1/options/legacy/migration-status
+# returning "complete". The new API's full single-account flow (live quotes,
+# balance, settlement watching) needs interactive OAuth2+PKCE login, not yet
+# wired up. Until then, Jarvis buys through the Bulk Purchase REST endpoint,
+# which accepts a Personal Access Token directly. See deriv.py for details.
+DERIV_APP_ID = os.getenv("DERIV_APP_ID", "1089")  # sent as the Deriv-App-ID header
 DERIV_TOKEN_DEMO = os.getenv("DERIV_TOKEN_DEMO", "")
 DERIV_TOKEN_REAL = os.getenv("DERIV_TOKEN_REAL", "")
+# Options-account IDs (format "DOT..."), visible in the API Playground's account
+# switcher or via GET /trading/v1/options/accounts once OAuth is wired.
+DERIV_ACCOUNT_ID_DEMO = os.getenv("DERIV_ACCOUNT_ID_DEMO", "")
+DERIV_ACCOUNT_ID_REAL = os.getenv("DERIV_ACCOUNT_ID_REAL", "")
 # Hard switch: "demo" or "real". Jarvis announces the active account on boot.
 DERIV_ENV = os.getenv("DERIV_ENV", "demo").lower()
-DERIV_WS_URL = f"wss://ws.derivws.com/websockets/v3?app_id={DERIV_APP_ID}"
+DERIV_REST_BASE = "https://api.derivws.com"
 
 # --- Risk Governor (Jarvis's constitution — TRON knows nothing of this) ---
 STAKE_DEFAULT = float(os.getenv("STAKE_DEFAULT", "1.0"))       # USD per tap
@@ -77,3 +87,7 @@ def deriv_symbol(tv_ticker: str) -> str | None:
 
 def active_token() -> str:
     return DERIV_TOKEN_REAL if DERIV_ENV == "real" else DERIV_TOKEN_DEMO
+
+
+def active_account_id() -> str:
+    return DERIV_ACCOUNT_ID_REAL if DERIV_ENV == "real" else DERIV_ACCOUNT_ID_DEMO

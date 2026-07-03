@@ -4,19 +4,23 @@ TRON detects on the price grid. JARVIS receives, classifies, speaks, and execute
 
 ## Architecture
 
-TradingView (TRON, Premium) → JSON webhook → JARVIS (FastAPI) → SQLite Ledger → Telegram (Jarvis voice + Tap-to-Trade buttons) → Deriv WS API (vanilla / rise-fall / multipliers, demo or real).
+TradingView (TRON, Premium) → JSON webhook → JARVIS (FastAPI) → SQLite Ledger → Telegram (Jarvis voice + Tap-to-Trade buttons) → Deriv (vanilla / rise-fall / multipliers, demo or real).
 
 Tier routing: EXECUTE signals get an operator card with ⚡ buttons and a broadcast copy without buttons for the channel. CONTEXT signals get an informational card. NOISE goes to the ledger only — Jarvis holds the trash.
+
+**Deriv integration status — fast path, not final.** Deriv retired the legacy WebSocket API for migrated accounts (`GET /trading/v1/options/legacy/migration-status` → `"complete"`). The new API's full flow (live quote before buy, balance checks, settlement watching) needs interactive OAuth2 + PKCE login, not yet built. Right now Jarvis buys through the **Bulk Purchase** REST endpoint (`POST /trading/v1/options/contracts/bulk-purchase/{demo|real}`), which takes a Personal Access Token directly — no OAuth, but also no pre-quote, no balance lookup, and no way to watch a contract to settlement (`_watch_contract` sends one "can't track this" note and stops). See `jarvis/app/deriv.py`'s docstring for the exact trade-off and the `TODO(oauth)` marking what full parity needs.
 
 ## Setup — Replit (current deployment target)
 
 The repo root has a `.replit` config already pointed at `jarvis/`. Jarvis holds a Telegram polling loop and background "watch this contract" tasks that must stay alive between webhooks, so this must be a **Reserved VM** deployment, not Autoscale — Autoscale spins to zero between requests and would kill both the polling loop and the in-memory `_pending` tap-to-trade queue.
 
 1. **Import**: Replit → Create App → Import from GitHub → this repo.
-2. **Secrets** (Replit's lock icon in the sidebar, not `.env` — Replit injects these as real env vars): set every key listed in `jarvis/.env.example` — `WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OPERATOR_ID`, `TELEGRAM_BROADCAST_ID`, `DERIV_APP_ID`, `DERIV_TOKEN_DEMO`, `DERIV_TOKEN_REAL`, `DERIV_ENV=demo`, `AUTO_TRADE=false`.
+2. **Secrets** (Replit's lock icon in the sidebar, not `.env` — Replit injects these as real env vars): set every key listed in `jarvis/.env.example` — `WEBHOOK_SECRET`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_OPERATOR_ID`, `TELEGRAM_BROADCAST_ID`, `DERIV_APP_ID`, `DERIV_TOKEN_DEMO`, `DERIV_TOKEN_REAL`, `DERIV_ACCOUNT_ID_DEMO`, `DERIV_ACCOUNT_ID_REAL`, `DERIV_ENV=demo`, `AUTO_TRADE=false`.
    - Telegram bot: create via @BotFather, paste the token, run once, send `/start` — it replies with your operator id, put that in `TELEGRAM_OPERATOR_ID`.
-   - Deriv tokens: Deriv → Settings → API Token, one on demo and one on real, both `trade` + `read` scopes.
-   - Deriv app id: register your own at api.deriv.com.
+   - Deriv tokens: Deriv → Settings → API Token, one on demo and one on real, `trade` scope.
+   - Deriv account IDs: the "DOT..." id shown in the API Playground's account switcher for each account.
+   - Deriv app id: register your own at api.deriv.com — used as the `Deriv-App-ID` header.
+   - **Every time you change a Secret, open a brand-new Shell tab before testing** — Replit shells snapshot env vars at open time, so an existing shell keeps seeing the old value.
 3. **Deploy**: the Deploy tab → type **Reserved VM** → it reads the `[deployment]` block in `.replit` (`pip install -r jarvis/requirements.txt` then `uvicorn app.main:app --host 0.0.0.0 --port 8080`) → Deploy. You get a stable `https://<name>.replit.app` URL — that's your webhook host, TLS already handled.
 4. **TradingView side**: `TRON_Glassbox_SignalGenerator.pine` (repo root) already emits JSON — STEP 17 was merged. Load it on the chart, create ONE alert with condition "Any alert() function call", Message = `{{alert_message}}`, Webhook URL = `https://<name>.replit.app/webhook/tron?key=YOUR_WEBHOOK_SECRET`.
 

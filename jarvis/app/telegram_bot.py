@@ -106,12 +106,20 @@ async def execute_signal(sig: TronSignal, signal_id: int, stake: float,
 async def _watch_contract(contract_id: int, sig: TronSignal):
     """Poll until the contract settles, then speak the outcome."""
     client = deriv.DerivClient()
-    for _ in range(240):  # up to ~2h at 30s
+    for attempt in range(240):  # up to ~2h at 30s
         await asyncio.sleep(30)
         try:
             st = await client.contract_status(contract_id)
         except deriv.DerivError as e:
             log.warning("watch %s: %s", contract_id, e)
+            if attempt == 0:
+                # Fast-path mode can't poll status at all — one attempt is enough
+                # to know that, no point retrying 240 times against a dead call.
+                await send_operator(
+                    f"JARVIS — NOTE\n{voice.DIV}\n"
+                    f"Can't auto-track contract {contract_id} to settlement yet "
+                    f"({e}).\n")
+                return
             continue
         if st["is_sold"]:
             profit = float(st.get("profit") or 0)

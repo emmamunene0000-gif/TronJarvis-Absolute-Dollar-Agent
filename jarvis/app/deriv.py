@@ -1,20 +1,29 @@
 """
 JARVIS — Deriv Execution Hand.
 
-One WebSocket pipeline, three weapons:
-  vanilla    → VANILLALONGCALL / VANILLALONGPUT  (strike + expiry)
-  rise_fall  → CALL / PUT                        (direction + expiry)
-  multiplier → MULTUP / MULTDOWN                 (+ optional TP/SL limit orders)
+FAST PATH (current): Deriv retired the legacy WebSocket API for this
+account — confirmed via GET /trading/v1/options/legacy/migration-status
+returning "complete". The new API's full single-account trading flow
+(live quote before buy, balance checks, settlement watching) requires
+interactive OAuth2 + PKCE login, which isn't wired up yet.
 
-Flow per trade: connect → authorize → proposal → buy → report.
-Glassbox rule: the proposal (Deriv's own quote) is always surfaced to the
-operator before/with execution — no hidden pricing.
+Until that lands, Jarvis buys through the Bulk Purchase REST endpoint,
+which takes a Personal Access Token directly in the request body — no
+OAuth, no browser redirect. Trade-off: direct buy only, no pre-quote,
+no balance lookup, no contract-status polling.
+
+  vanilla    -> VANILLALONGCALL / VANILLALONGPUT  (strike + expiry)
+  rise_fall  -> CALL / PUT                        (direction + expiry)
+  multiplier -> MULTUP / MULTDOWN                 (+ optional TP/SL)
+
+TODO(oauth): once OAuth2+PKCE login is added, switch to the full
+WebSocket flow (proposal -> buy -> proposal_open_contract) via an
+OTP-authenticated connection to restore quotes, balance, and
+settlement watching.
 """
-import asyncio
-import json
 import logging
 
-import websockets
+import httpx
 
 from . import config
 
@@ -35,131 +44,106 @@ class DerivError(Exception):
 
 
 class DerivClient:
-    """Short-lived connection per operation. Simple, stateless, resilient —
-    matches the TRON philosophy: no long-lived position state in the pipe."""
+    """Bulk Purchase REST client, single account entry per call."""
 
-    def __init__(self, token: str | None = None):
+    def __init__(self, token: str | None = None, account_id: str | None = None):
         self.token = token or config.active_token()
+        self.account_id = account_id or config.active_account_id()
         if not self.token:
             raise DerivError(f"No Deriv token configured for env '{config.DERIV_ENV}'")
-
-    async def _call(self, ws, request: dict) -> dict:
-        await ws.send(json.dumps(request))
-        while True:
-            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=15))
-            if "error" in resp:
-                raise DerivError(resp["error"].get("message", str(resp["error"])))
-            # skip unrelated subscription pushes
-            if resp.get("msg_type") in (request_msg_type(request), "authorize", "proposal",
-                                         "buy", "proposal_open_contract", "balance"):
-                return resp
-
-    async def _session(self):
-        ws = await websockets.connect(config.DERIV_WS_URL, open_timeout=15)
-        auth = await self._call(ws, {"authorize": self.token})
-        return ws, auth["authorize"]
+        if not self.account_id:
+            raise DerivError(
+                f"No Deriv account id configured for env '{config.DERIV_ENV}' "
+                f"(set DERIV_ACCOUNT_ID_{config.DERIV_ENV.upper()})")
 
     async def account_info(self) -> dict:
-        ws, auth = await self._session()
-        try:
-            bal = await self._call(ws, {"balance": 1})
-            return {
-                "loginid": auth.get("loginid"),
-                "currency": auth.get("currency"),
-                "is_virtual": bool(auth.get("is_virtual")),
-                "balance": bal["balance"]["balance"],
-            }
-        finally:
-            await ws.close()
+        """No OAuth yet, so no live balance call — just confirms config is present."""
+        return {
+            "loginid": self.account_id,
+            "currency": "",
+            "is_virtual": config.DERIV_ENV != "real",
+            "balance": "n/a — bulk-purchase mode (OAuth not wired yet)",
+        }
 
-    def _build_proposal(self, mode: str, bias: str, symbol: str, stake: float,
-                        expiry_min: int, strike: float | None,
-                        tp: float | None, sl: float | None) -> dict:
+    def _build_contract_parameters(self, mode: str, bias: str, symbol: str,
+                                   stake: float, expiry_min: int,
+                                   strike: float | None,
+                                   tp: float | None, sl: float | None) -> dict:
         ct = CONTRACT_MAP.get((mode, bias))
         if ct is None:
             raise DerivError(f"No contract mapping for mode={mode} bias={bias}")
 
-        p: dict = {
-            "proposal": 1,
+        params: dict = {
             "contract_type": ct,
             "symbol": symbol,
-            "currency": "USD",
             "amount": round(stake, 2),
-            "basis": "stake",
         }
 
         if mode in ("vanilla", "rise_fall"):
-            p["duration"] = max(1, int(expiry_min))
-            p["duration_unit"] = "m"
+            params["duration"] = max(1, int(expiry_min))
+            params["duration_unit"] = "m"
 
         if mode == "vanilla":
-            # Deriv vanillas take an absolute barrier (the strike TRON computed).
             if strike is None:
                 raise DerivError("vanilla mode requires a strike")
-            p["barrier"] = str(strike)
+            params["barrier"] = str(strike)
         elif mode == "multiplier":
-            p["multiplier"] = config.MULTIPLIER_DEFAULT
+            params["multiplier"] = config.MULTIPLIER_DEFAULT
             limits = {}
             if tp is not None:
                 limits["take_profit"] = round(abs(tp), 2)
             if sl is not None:
                 limits["stop_loss"] = round(abs(sl), 2)
             if limits:
-                p["limit_order"] = limits
-        return p
-
-    async def quote(self, **kw) -> dict:
-        """Get Deriv's live proposal without buying — the glassbox price check."""
-        ws, _ = await self._session()
-        try:
-            prop = await self._call(ws, self._build_proposal(**kw))
-            return prop["proposal"]
-        finally:
-            await ws.close()
+                params["limit_order"] = limits
+        return params
 
     async def buy(self, mode: str, bias: str, symbol: str, stake: float,
                   expiry_min: int = 5, strike: float | None = None,
                   tp_amount: float | None = None, sl_amount: float | None = None) -> dict:
-        """proposal → buy in one session. Returns contract receipt."""
-        ws, auth = await self._session()
+        """Bulk Purchase with a single account entry. Direct buy, no pre-quote."""
+        contract_parameters = self._build_contract_parameters(
+            mode, bias, symbol, stake, expiry_min, strike, tp_amount, sl_amount)
+
+        env_path = "real" if config.DERIV_ENV == "real" else "demo"
+        url = f"{config.DERIV_REST_BASE}/trading/v1/options/contracts/bulk-purchase/{env_path}"
+        headers = {"Deriv-App-ID": config.DERIV_APP_ID, "Content-Type": "application/json"}
+        body = {
+            "contract_parameters": contract_parameters,
+            "accounts": [{"token": self.token, "account_id": self.account_id}],
+        }
+
+        async with httpx.AsyncClient(timeout=20) as http:
+            resp = await http.post(url, headers=headers, json=body)
+
         try:
-            req = self._build_proposal(mode, bias, symbol, stake, expiry_min,
-                                       strike, tp_amount, sl_amount)
-            prop = (await self._call(ws, req))["proposal"]
-            buy = await self._call(ws, {"buy": prop["id"], "price": prop["ask_price"]})
-            receipt = buy["buy"]
-            return {
-                "env": "demo" if auth.get("is_virtual") else "real",
-                "loginid": auth.get("loginid"),
-                "contract_id": receipt["contract_id"],
-                "buy_price": receipt["buy_price"],
-                "payout": receipt.get("payout"),
-                "longcode": receipt.get("longcode"),
-                "ask_quote": prop.get("display_value"),
-                "spot_at_buy": prop.get("spot"),
-            }
-        finally:
-            await ws.close()
+            payload = resp.json()
+        except ValueError:
+            raise DerivError(f"Non-JSON response ({resp.status_code}): {resp.text[:200]}")
+
+        if resp.status_code >= 400:
+            raise DerivError(f"HTTP {resp.status_code}: {payload}")
+
+        txns = payload.get("data", {}).get("transactions", [])
+        if not txns:
+            raise DerivError(f"No transaction in response: {payload}")
+
+        txn = txns[0]
+        if "error" in txn:
+            raise DerivError(txn["error"].get("message", str(txn["error"])))
+
+        return {
+            "env": env_path,
+            "loginid": txn.get("account_id", self.account_id),
+            "contract_id": txn.get("contract_id"),
+            "buy_price": txn.get("buy_price"),
+            "payout": None,
+            "longcode": None,
+            "ask_quote": None,
+            "spot_at_buy": None,
+        }
 
     async def contract_status(self, contract_id: int) -> dict:
-        ws, _ = await self._session()
-        try:
-            resp = await self._call(ws, {"proposal_open_contract": 1,
-                                         "contract_id": contract_id})
-            poc = resp["proposal_open_contract"]
-            return {
-                "is_sold": bool(poc.get("is_sold")),
-                "profit": poc.get("profit"),
-                "status": poc.get("status"),
-                "current_spot": poc.get("current_spot"),
-                "longcode": poc.get("longcode"),
-            }
-        finally:
-            await ws.close()
-
-
-def request_msg_type(request: dict) -> str:
-    for k in ("proposal", "buy", "balance", "authorize", "proposal_open_contract"):
-        if k in request:
-            return k if k != "proposal_open_contract" else "proposal_open_contract"
-    return ""
+        raise DerivError(
+            "Settlement tracking needs the OAuth upgrade (not yet wired) — "
+            "check the Deriv app for this contract's outcome.")
