@@ -1,5 +1,6 @@
 entrypoint = "jarvis/app/main.py"
 modules = ["python-3.11"]
+run = "cd jarvis && pip install -q -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8080"
 
 [nix]
 channel = "stable-23_11"
