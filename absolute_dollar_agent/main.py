@@ -1,5 +1,5 @@
 """
-TradersMind — Main Orchestrator
+Absolute Dollar Agent — Main Orchestrator
 Wires all layers: TRON -> Mind (classify/route/narrate/remember) -> Governor -> Bridge/Body
 
 No paper mode anywhere in this file (CLAUDE.md §5/§18) — TRADING_MODE is
@@ -24,11 +24,11 @@ from mind import router as signal_router
 from bridge.deriv_client import DerivBridge, DerivConfig, DerivError
 from bridge.contract_mapper import ContractMapper
 from governor.risk_engine import RiskGovernor, RiskProfile, can_unlock_live_mode
-from body.telegram_bot import TradersMindBot
+from body.telegram_bot import AbsoluteDollarAgentBot
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-log = logging.getLogger("tradersmind.main")
+log = logging.getLogger("absolute_dollar_agent.main")
 
 VALID_TRADING_MODES = {"demo", "live"}
 
@@ -41,7 +41,7 @@ def _load_settings() -> dict:
     return {}
 
 
-class TradersMind:
+class AbsoluteDollarAgent:
     """The complete system. One instance per trading session."""
 
     def __init__(self):
@@ -80,7 +80,7 @@ class TradersMind:
             account_id=os.getenv("DERIV_ACCOUNT_ID", ""),
             is_demo=(self.mode == "demo"),
         ))
-        self.telegram = TradersMindBot(
+        self.telegram = AbsoluteDollarAgentBot(
             token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
             chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
             governor=self.governor,
@@ -96,7 +96,7 @@ class TradersMind:
         self._running = False
 
     async def start(self):
-        print("TradersMind initializing...")
+        print("Absolute Dollar Agent initializing...")
         print(f"   Mode: {self.mode.upper()}")
         print(f"   Auto-execute: {self.auto_execute}")
 
@@ -122,7 +122,7 @@ class TradersMind:
         self._running = True
         asyncio.create_task(self._signal_processor())
         print("   Signal processor running")
-        print("\nTradersMind is LIVE — waiting for TRON signals...")
+        print("\nAbsolute Dollar Agent is LIVE — waiting for TRON signals...")
 
     async def _signal_processor(self):
         while self._running:
@@ -286,7 +286,7 @@ class TradersMind:
         self._running = False
         await self.deriv.disconnect()
         await self.telegram.stop()
-        print("\nTradersMind shutdown complete")
+        print("\nAbsolute Dollar Agent shutdown complete")
 
 
 # Entry point
@@ -294,22 +294,22 @@ if __name__ == "__main__":
     import uvicorn
     from fastapi import FastAPI
     from tron.webhook import router as tron_router
-    from face.app import app as face_app
+    from interface.app import app as interface_app
 
-    app = FastAPI(title="TradersMind", version="1.0.0")
+    app = FastAPI(title="Absolute Dollar Agent", version="1.0.0")
     app.include_router(tron_router)
-    for route in face_app.routes:
+    for route in interface_app.routes:
         app.routes.append(route)
 
-    mind = TradersMind()
+    agent = AbsoluteDollarAgent()
 
     @app.on_event("startup")
     async def startup():
-        await mind.start()
+        await agent.start()
 
     @app.on_event("shutdown")
     async def shutdown():
-        await mind.shutdown()
+        await agent.shutdown()
 
     port = int(os.getenv("WEBHOOK_PORT", "8080"))
     uvicorn.run(app, host="0.0.0.0", port=port)

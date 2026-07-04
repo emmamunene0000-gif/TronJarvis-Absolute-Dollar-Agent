@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, asdict
 
-DB_PATH = "tradersmind.db"
+DB_PATH = "absolute_dollar_agent.db"
 
 @dataclass
 class TradeEpisode:

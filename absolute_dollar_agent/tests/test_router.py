@@ -55,11 +55,19 @@ class TestRouting:
         decision = route("CALL_CONTINUATION", {"vanilla"}, ["vanilla", "multiplier", "rise_fall"])
         assert decision.auto_style is None
 
-    def test_entry_is_tap_executable_to_rise_fall_even_when_not_auto_routed(self):
+    def test_entry_prefers_vanilla_but_rise_fall_stays_tap_available(self):
+        # Vanilla wins the style_priority tie-break when all three are enabled...
         decision = route("CALL_ENTRY", {"vanilla", "multiplier", "rise_fall"},
                           ["vanilla", "multiplier", "rise_fall"])
         assert decision.auto_style == "vanilla"
         assert "rise_fall" in decision.tap_styles
+
+    def test_entry_auto_routes_to_rise_fall_when_its_the_only_enabled_style(self):
+        # ...but per operator decision (2026-07-04), Rise/Fall is a first-class
+        # auto-route target for entries too, not tap-only — confirmed by
+        # falling through to it when Vanilla/Multiplier are both disabled.
+        decision = route("CALL_ENTRY", {"rise_fall"}, ["vanilla", "multiplier", "rise_fall"])
+        assert decision.auto_style == "rise_fall"
 
     def test_zone_break_has_no_style_fit(self):
         # Locked per operator: zone breaks stay CONTEXT permanently, never routed.

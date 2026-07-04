@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 import httpx
 
-log = logging.getLogger("tradersmind.bridge")
+log = logging.getLogger("absolute_dollar_agent.bridge")
 
 CONTRACT_MAP = {
     ("vanilla", "CALL"): "VANILLALONGCALL",

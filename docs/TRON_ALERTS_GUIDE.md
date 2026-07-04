@@ -5,11 +5,11 @@ signal hierarchy, the detection engines behind each alert, the trail-flip
 masterclass, and a per-alert-type action protocol. It documents TRON itself
 — it applies no matter what backend receives TRON's webhook.
 
-For current architecture, doctrine, and build status, see `/CLAUDE.md`
-(the master spec) and `/tradersmind/README.md` (the deployed system). This
-file used to also describe an earlier execution backend that has since
-been superseded by `tradersmind/` — that material has been removed here to
-avoid two docs disagreeing about a system that no longer exists.
+For current architecture, doctrine, and build status, see the root
+`README.md` (the single source of truth) and `/absolute_dollar_agent/README.md`
+(the deployed system). This file used to also describe an earlier execution
+backend that has since been superseded — that material has been removed
+here to avoid two docs disagreeing about a system that no longer exists.
 
 ---
 
@@ -405,15 +405,15 @@ TRON_Glassbox_SignalGenerator.pine   ← TRON — the only Pine Script in this r
                                         Emits JSON (engine=TRON_GBX_v3) on every
                                         signal in this doc's hierarchy.
 
-tradersmind/                         ← The deployed system that receives TRON's
+absolute_dollar_agent/                ← The deployed system that receives TRON's
                                         webhook, classifies/narrates/sizes/executes.
-                                        See tradersmind/README.md.
+                                        See absolute_dollar_agent/README.md.
 
-CLAUDE.md                            ← Master build spec, doctrine, and the
-                                        verification/rebuild log.
+README.md                            ← Root doctrine, architecture, and
+                                        verified build status.
 ```
 
-Build status, architecture, and doctrine live in `/CLAUDE.md` and
-`/tradersmind/README.md` now — this file stays scoped to what TRON's alerts
-mean and how to act on them, so it doesn't drift out of sync with whichever
-backend is deployed.
+Build status, architecture, and doctrine live in the root `README.md` and
+`/absolute_dollar_agent/README.md` now — this file stays scoped to what
+TRON's alerts mean and how to act on them, so it doesn't drift out of sync
+with whichever backend is deployed.
