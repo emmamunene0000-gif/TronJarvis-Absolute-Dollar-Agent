@@ -1,0 +1,60 @@
+app:
+  name: "TradersMind"
+  version: "1.0.0"
+  description: "Just a Really Very Intelligent Sidekick"
+
+tron:
+  expected_schema_version: 1
+  max_signals_per_minute: 10
+  allowed_pairs:
+    - "R_10"
+    - "R_25"
+    - "R_50"
+    - "R_75"
+    - "R_100"
+    - "1HZ10V"
+    - "1HZ25V"
+    - "1HZ50V"
+    - "1HZ75V"
+    - "1HZ100V"
+  allowed_timeframes:
+    - "1"
+    - "5"
+    - "15"
+    - "60"
+    - "240"
+
+narrative:
+  templates:
+    sovereign_call: "SOVEREIGN CALL — H4 flipped BULL. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
+    sovereign_put: "SOVEREIGN PUT — H4 flipped BEAR. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
+    mtf_call: "MTF FLIP CALL — M15/H1 trail flipped BULL. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
+    mtf_put: "MTF FLIP PUT — M15/H1 trail flipped BEAR. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
+    sniper_call: "SNIPER CALL — Zone retest confirmed. Price returned to broken resistance. Trail confirms BULL. Confidence {confidence}%."
+    sniper_put: "SNIPER PUT — Zone retest confirmed. Price returned to broken support. Trail confirms BEAR. Confidence {confidence}%."
+    entry_call: "CALL ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
+    entry_put: "PUT ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
+    continuation_call: "CALL CONTINUATION — Momentum re-confirmed. RSI sustain BULL. Adding to bias."
+    continuation_put: "PUT CONTINUATION — Momentum re-confirmed. RSI sustain BEAR. Adding to bias."
+    regime_bull: "BULLISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for CALL setups."
+    regime_bear: "BEARISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for PUT setups."
+
+memory:
+  similarity_features:
+    - sync_layers
+    - confidence
+    - rsi
+    - vwap_state
+    - fib_state
+    - structure_bias
+    - vp_position
+    - atr
+    - session_hour
+  knn_k: 5
+
+risk:
+  default_stake: 5.0
+  kelly_fraction: 0.25
+  max_leverage: 100
+  min_confidence_for_auto: 85
+  min_sync_layers_for_auto: 4

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }} v{{ version }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0e1a;
+            color: #e0e6ed;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a1f2e 0%, #0f1419 100%);
+            padding: 20px 40px;
+            border-bottom: 1px solid #2a3142;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #00d4aa, #00a8e8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .badge {
+            background: #1e3a2f;
+            color: #00d4aa;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #00d4aa40;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .chart-panel {
+            background: #111827;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            overflow: hidden;
+            height: 600px;
+        }
+        .chart-panel iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .panel {
+            background: #111827;
+            border-radius: 12px;
+            border: 1px solid #1f2937;
+            padding: 16px;
+        }
+        .panel h3 {
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        .signal-card {
+            background: #1a2332;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-left: 3px solid #00d4aa;
+            transition: all 0.2s;
+        }
+        .signal-card.bear { border-left-color: #ef4444; }
+        .signal-card:hover { background: #1e293b; }
+        .signal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .signal-type {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .signal-conf {
+            background: #1e3a2f;
+            color: #00d4aa;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        .signal-details {
+            font-size: 12px;
+            color: #9ca3af;
+            line-height: 1.5;
+        }
+        .signal-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .btn {
+            flex: 1;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-execute {
+            background: linear-gradient(135deg, #00d4aa, #00a8e8);
+            color: white;
+        }
+        .btn-execute:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-secondary {
+            background: #1f2937;
+            color: #9ca3af;
+        }
+        .btn-secondary:hover { background: #374151; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .stat-box {
+            background: #1a2332;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #00d4aa;
+        }
+        .stat-value.negative { color: #ef4444; }
+        .stat-label {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .risk-bar {
+            height: 4px;
+            background: #1f2937;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .risk-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00d4aa, #f59e0b, #ef4444);
+            border-radius: 2px;
+            transition: width 0.5s;
+        }
+        .live-ticket {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #1f2937;
+        }
+        .live-ticket:last-child { border-bottom: none; }
+        .pnl-positive { color: #00d4aa; }
+        .pnl-negative { color: #ef4444; }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-active { background: #00d4aa; animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>🤖 TradersMind</h1>
+            <div style="color: #6b7280; font-size: 12px; margin-top: 4px;">Just a Really Very Intelligent Sidekick</div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span class="badge">📊 PAPER MODE</span>
+            <span class="badge" style="background: #1e3a2f;">🟢 ACTIVE</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="chart-panel">
+            <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_chart&symbol=DERIV%3AR_100&interval=5&theme=dark&style=1&locale=en&toolbarbg=f1f3f6&enable_publishing=false&hide_top_toolbar=false&hide_legend=false&save_image=false&calendar=false&studies=[]&hideideas=true&referral_id=tradersmind" 
+                    title="TradingView Chart"></iframe>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <h3>📊 Session Stats</h3>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="daily-pnl">$0.00</div>
+                        <div class="stat-label">Daily P&L</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="win-rate">0%</div>
+                        <div class="stat-label">Win Rate</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="total-trades">0</div>
+                        <div class="stat-label">Trades</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="active-count">0</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                </div>
+                <div style="margin-top: 12px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; color: #6b7280;">
+                        <span>Risk Heat</span>
+                        <span id="heat-level">COOL</span>
+                    </div>
+                    <div class="risk-bar">
+                        <div class="risk-fill" id="heat-bar" style="width: 10%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🎯 Active Signals</h3>
+                <div id="signals-container">
+                    <div class="signal-card">
+                        <div class="signal-header">
+                            <span class="signal-type">H4 FLIP CALL</span>
+                            <span class="signal-conf">87%</span>
+                        </div>
+                        <div class="signal-details">
+                            Vol 100 @ 314.50 | Strike: 314.50 ATM<br>
+                            Expiry: 8m | RR: 1:1.5 | Sync: 4/4
+                        </div>
+                        <div class="signal-actions">
+                            <button class="btn btn-execute">▶️ EXECUTE</button>
+                            <button class="btn btn-secondary">🧠 WHY?</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>💰 Active Trades</h3>
+                <div id="tickets-container">
+                    <div style="text-align: center; color: #6b7280; padding: 20px;">
+                        <span class="status-dot status-active"></span>
+                        No active trades
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'heartbeat') {
+                updateDashboard(data);
+            }
+        };
+
+        function updateDashboard(data) {
+            // Update active signals
+            const signalsContainer = document.getElementById('signals-container');
+            if (data.active_signals && data.active_signals.length > 0) {
+                signalsContainer.innerHTML = data.active_signals.map(s => `
+                    <div class="signal-card ${s.bias === 'PUT' ? 'bear' : ''}">
+                        <div class="signal-header">
+                            <span class="signal-type">${s.signal}</span>
+                            <span class="signal-conf">${s.confidence}%</span>
+                        </div>
+                        <div class="signal-details">
+                            ${s.symbol} @ ${s.spot} | Strike: ${s.setup?.strike || '—'}<br>
+                            Expiry: ${s.setup?.expiry_min || '—'}m | RR: ${s.setup?.rr || '—'}:1
+                        </div>
+                        <div class="signal-actions">
+                            <button class="btn btn-execute" onclick="executeSignal('${s.signal}')">▶️ EXECUTE</button>
+                            <button class="btn btn-secondary">🧠 WHY?</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Update active trades
+            const ticketsContainer = document.getElementById('tickets-container');
+            if (data.active_trades && data.active_trades.length > 0) {
+                ticketsContainer.innerHTML = data.active_trades.map(t => `
+                    <div class="live-ticket">
+                        <div>
+                            <span class="status-dot status-active"></span>
+                            <span style="font-size: 12px;">#${t.contract_id?.slice(-6) || 'N/A'}</span>
+                        </div>
+                        <div class="${t.current_profit >= 0 ? 'pnl-positive' : 'pnl-negative'}">
+                            ${t.current_profit >= 0 ? '+' : ''}$${t.current_profit?.toFixed(2) || '0.00'}
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('active-count').textContent = data.active_trades.length;
+            }
+        }
+
+        function executeSignal(signalId) {
+            fetch('/api/execute', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({signal_id: signalId})
+            });
+        }
+    </script>
+</body>
+</html>
