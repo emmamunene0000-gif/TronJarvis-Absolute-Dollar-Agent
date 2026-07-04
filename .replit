@@ -1,14 +1,14 @@
-entrypoint = "tradersmind/main.py"
+entrypoint = "absolute_dollar_agent/main.py"
 modules = ["python-3.11"]
-run = "cd tradersmind && pip install -q -r requirements.txt && python main.py"
+run = "cd absolute_dollar_agent && pip install -q -r requirements.txt && python main.py"
 
 [nix]
 channel = "stable-23_11"
 
 [deployment]
 deploymentTarget = "vm"
-build = ["sh", "-c", "cd tradersmind && pip install -r requirements.txt"]
-run = ["sh", "-c", "cd tradersmind && python main.py"]
+build = ["sh", "-c", "cd absolute_dollar_agent && pip install -r requirements.txt"]
+run = ["sh", "-c", "cd absolute_dollar_agent && python main.py"]
 
 [[ports]]
 localPort = 8080

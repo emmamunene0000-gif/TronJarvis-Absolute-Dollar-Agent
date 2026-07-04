@@ -1,7 +1,7 @@
 """
 Signal Router — Classification (CLAUDE.md §7) + Routing Matrix (§8).
 
-TradersMind never invents a signal (doctrine §2.1). This module is the only
+Absolute Dollar Agent never invents a signal (doctrine §2.1). This module is the only
 place that decides what a TRON signal is allowed to do:
   EXECUTE  -> may place a trade if its route-style is enabled
   CONTEXT  -> narrated/logged only, never an independent trade
@@ -49,9 +49,13 @@ FLIP_PRIORITY = {
 }
 
 # §8 Routing Matrix — which styles a given EXECUTE signal best-fits.
+# CALL_ENTRY/PUT_ENTRY include rise_fall per operator decision (2026-07-04):
+# entries are eligible to auto-route to Rise/Fall too, not just Vanilla/
+# Multiplier — resolves open decision #3 in favor of full auto-routing
+# rather than tap-only override.
 STYLE_FIT = {
-    "CALL_ENTRY": {"vanilla", "multiplier"},
-    "PUT_ENTRY": {"vanilla", "multiplier"},
+    "CALL_ENTRY": {"vanilla", "multiplier", "rise_fall"},
+    "PUT_ENTRY": {"vanilla", "multiplier", "rise_fall"},
     "CALL_CONTINUATION": {"rise_fall"},
     "PUT_CONTINUATION": {"rise_fall"},
     "H4_FLIP_CALL": {"vanilla", "multiplier"},
@@ -60,14 +64,6 @@ STYLE_FIT = {
     "MTF_FLIP_PUT": {"vanilla", "multiplier"},
     "TRAIL_FLIP_CALL": {"rise_fall", "vanilla", "multiplier"},
     "TRAIL_FLIP_PUT": {"rise_fall", "vanilla", "multiplier"},
-}
-
-# Locked per operator: CALL_ENTRY/PUT_ENTRY may also be tap-executed to
-# Rise/Fall as a manual override, even though it isn't in the auto-route
-# fit set above (open decision #3 in §8).
-TAP_ONLY_EXTRA_STYLES = {
-    "CALL_ENTRY": {"rise_fall"},
-    "PUT_ENTRY": {"rise_fall"},
 }
 
 
@@ -106,7 +102,7 @@ def route(signal_type: str, enabled_styles: set[str],
             auto_style = style
             break
 
-    tap_styles = set(best_fit) | TAP_ONLY_EXTRA_STYLES.get(signal_type, set())
+    tap_styles = set(best_fit)
     tap_styles &= enabled_styles or tap_styles  # if nothing enabled, still show every fit for manual choice
 
     return RouteDecision(auto_style=auto_style, tap_styles=sorted(tap_styles))

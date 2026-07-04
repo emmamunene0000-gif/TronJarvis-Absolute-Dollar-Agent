@@ -10,15 +10,15 @@ from typing import Any, Callable, Optional
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
-log = logging.getLogger("tradersmind.telegram")
+log = logging.getLogger("absolute_dollar_agent.telegram")
 
 STYLE_LABELS = {"vanilla": "VANILLA", "multiplier": "MULTIPLIER", "rise_fall": "RISE/FALL"}
 
 
-class TradersMindBot:
-    """Telegram interface for TradersMind. Receives signals, shows cards,
-    handles tap-to-execute. Reads live Governor/Memory state — it doesn't
-    hold its own copy of the truth."""
+class AbsoluteDollarAgentBot:
+    """Telegram interface for Absolute Dollar Agent. Receives signals, shows
+    cards, handles tap-to-execute. Reads live Governor/Memory state — it
+    doesn't hold its own copy of the truth."""
 
     def __init__(self, token: str, chat_id: str, governor, memory, demo_trades_required: int = 100):
         self.token = token
@@ -60,7 +60,7 @@ class TradersMindBot:
 
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
-            "TradersMind activated.\n"
+            "Absolute Dollar Agent activated.\n"
             "TRON detects. I classify, narrate, size, and (if you tap) execute.\n\n"
             "Commands: /status /risk /history"
         )

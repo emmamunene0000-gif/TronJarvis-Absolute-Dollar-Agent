@@ -1,5 +1,5 @@
 __pycache__/
 *.pyc
 .env
-tradersmind/tradersmind.db
+absolute_dollar_agent/absolute_dollar_agent.db
 .pytest_cache/

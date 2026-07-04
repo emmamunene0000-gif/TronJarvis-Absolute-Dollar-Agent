@@ -1,10 +1,9 @@
 """
-TradersMind Web Dashboard
+Absolute Dollar Agent — Web Interface
 Lightweight, real-time, embedded TradingView chart.
 """
 import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 import json
@@ -12,9 +11,8 @@ import asyncio
 from typing import Dict, List, Any
 from datetime import datetime
 
-app = FastAPI(title="TradersMind", version="1.0.0")
-app.mount("/static", StaticFiles(directory="face/static"), name="static")
-templates = Jinja2Templates(directory="face/templates")
+app = FastAPI(title="Absolute Dollar Agent", version="1.0.0")
+templates = Jinja2Templates(directory="interface/templates")
 
 # In-memory state (production: Redis)
 active_signals: List[Dict[str, Any]] = []
@@ -26,7 +24,7 @@ ws_connections: List[WebSocket] = []
 async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "app_name": "TradersMind",
+        "app_name": "Absolute Dollar Agent",
         "version": "1.0.0"
     })
 
