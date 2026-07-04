@@ -5,15 +5,15 @@ CLAUDE.md §1/§12 call for a persistent WebSocket bridge. That's not what
 this file implements, on purpose: Deriv retired the legacy WebSocket API
 (wss://ws.derivws.com) for migrated accounts — confirmed via
 GET /trading/v1/options/legacy/migration-status returning "complete" (see
-SYSTEM_DIAGNOSTIC.md §4). Every Personal Access Token fails InvalidToken
-against that endpoint regardless of app_id, for this account. This is the
-same fast-path pivot jarvis/app/deriv.py already made and proved against
-the live API.
+CLAUDE.md §20 for the full account-migration record). Every Personal Access
+Token fails InvalidToken against that endpoint regardless of app_id, for
+this account. This is the same fast-path pivot the prior flat-layout build
+already made and proved against the live API.
 
-Trade-off, same as jarvis: direct buy only via Bulk Purchase REST — no
-pre-quote, no balance lookup, no settlement-watching subscription. Restoring
-those needs interactive OAuth2 + PKCE login (tracked as future work, not
-part of this pass) and would swap this module back to a WebSocket flow.
+Trade-off: direct buy only via Bulk Purchase REST — no pre-quote, no
+balance lookup, no settlement-watching subscription. Restoring those needs
+interactive OAuth2 + PKCE login (tracked as future work, not part of this
+pass) and would swap this module back to a WebSocket flow.
 
   vanilla    -> VANILLALONGCALL / VANILLALONGPUT  (strike + expiry)
   rise_fall  -> CALL / PUT                        (direction + expiry)

@@ -1,8 +1,9 @@
 # TradersMind
-## Just a Really Very Intelligent Sidekick
+## Absolute Dollar Agent — Just a Really Very Intelligent Sidekick
 
-This is the one deployed tree for ADA/TradersMind — see `/CLAUDE.md` §20 for
-why `jarvis/` existed in parallel and what got ported from it into here.
+This is the one deployed tree for ADA. See `/CLAUDE.md` §20–22 for the full
+history of how it got here, including an earlier flat-layout build that
+existed in parallel and was ported into this tree, then retired.
 
 ---
 
@@ -50,7 +51,7 @@ TRON (TradingView) → Webhook → TradersMind (Replit)
 | Layer | File | Purpose |
 |-------|------|---------|
 | **TRON** | `tron/` | Pydantic models (18-signal whitelist), validator, webhook receiver |
-| **Mind** | `mind/` | Signal Router (classify + route), SQLite episodic memory, narrative engine, KNN similarity |
+| **Mind** | `mind/` | Signal Router (classify + route), SQLite episodic memory, narrative engine, KNN similarity module (see gap below) |
 | **Bridge** | `bridge/` | Deriv Bulk Purchase REST client, contract mapper |
 | **Governor** | `governor/` | Sizing law + hard limits, cooldowns, live-mode gate |
 | **Body** | `body/` | Telegram bot — tap-to-execute cards, live status/risk/history |
@@ -89,6 +90,16 @@ python main.py
 - **Webhook URL**: `https://your-replit-url/webhook/tron?key=your_secret`
 - **Message**: `{{alert_message}}`
 - **Condition**: Any alert() function call, frequency = Once Per Bar Close
+
+### 5. Telegram commands
+Message your bot once to register as the operator, then:
+- `/status` — daily P&L, trades today, win rate, risk state, heat
+- `/risk` — sizing band, hard limits, cooldown state, and the
+  live-mode gate counter (`N/100 completed demo trades`)
+- `/history` — last 10 executed trades
+
+Tap cards only appear for EXECUTE-tier signals; CONTEXT-tier signals post
+as plain informational messages with no buttons — that split is the point.
 
 ---
 
@@ -129,8 +140,10 @@ OAuth2 + PKCE login — tracked as future work, not part of this build.
 ## Risk Governor (§10)
 
 **Sizing law** (what the Governor actually charges): stake is sized
-dynamically between **$0.35 and $1.00**, scaled by confidence and,
-once episodes accumulate, the memory model's edge signal.
+dynamically between **$0.35 and $1.00**, scaled by confidence and, once
+similar episodes exist, a historical win-rate edge signal from
+`mind/memory.py`'s `get_stats_by_signal_type()` — a simple symbol+signal-type
+query, not yet the KNN feature-vector matcher (see gap below).
 
 **Hard limits** (never exceeded, nest around the sizing law):
 
@@ -150,12 +163,12 @@ until `mind/memory.py`'s ledger shows 100 completed (`WIN`/`LOSS`), actually
 
 ---
 
-## Signal Classification (§7) — resolved against jarvis's disagreement
+## Signal Classification (§7) — resolved against the prior build's disagreement
 
 `mind/router.py` locks two calls this spec makes differently than the
-jarvis/ tree it was ported from:
-- `SNIPER_CALL`/`SNIPER_PUT` → **CONTEXT** (jarvis had these as EXECUTE)
-- `BULL_BOS`/`BEAR_BOS` → **CONTEXT** (jarvis had these as NOISE)
+earlier flat-layout tree it was ported from:
+- `SNIPER_CALL`/`SNIPER_PUT` → **CONTEXT** (the prior build had these as EXECUTE)
+- `BULL_BOS`/`BEAR_BOS` → **CONTEXT** (the prior build had these as NOISE)
 
 Same-bar flip suppression is enforced: a fired `MTF_FLIP_*`/`TRAIL_FLIP_*`
 downgrades to CONTEXT if a higher-priority flip (`H4_FLIP_*` > `MTF_FLIP_*`
@@ -185,6 +198,10 @@ Scoped out of this pass, tracked for later build-sequence phases (§17):
 - Chart-centric UI with TRON signal markers overlaid on price (`face/`
   today is a session-stats panel + generic TradingView embed, not the
   glassbox chart §15 calls for).
+- `mind/similarity.py`'s KNN engine (`SimilarityEngine.find_similar`,
+  `TradeEpisode.feature_vector`) is instantiated in `main.py` but never
+  called — the live pipeline's edge signal comes from a simpler win-rate
+  query instead (§14's "Find similar setups → KNN" isn't wired in yet).
 - Cross-signal confidence modifiers from CONTEXT signals onto a
   co-occurring EXECUTE signal (§7's "raises/lowers confidence" note).
 - LightGBM edge model (needs 50–70 logged episodes first).

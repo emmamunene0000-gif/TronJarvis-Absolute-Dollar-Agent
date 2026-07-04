@@ -24,14 +24,14 @@ class TestClassification:
             assert classify(sig) in (TIER_EXECUTE, TIER_CONTEXT)
 
     def test_sniper_is_context_per_locked_spec(self):
-        # jarvis/app/parser.py classified this EXECUTE — §7 of this spec
-        # locks it CONTEXT, dormant unless show_zones is on.
+        # The prior flat-layout build classified this EXECUTE — §7 of this
+        # spec locks it CONTEXT, dormant unless show_zones is on.
         assert classify("SNIPER_CALL") == TIER_CONTEXT
         assert classify("SNIPER_PUT") == TIER_CONTEXT
 
     def test_bos_is_context_per_locked_spec(self):
-        # jarvis/app/parser.py classified this NOISE — §7 locks it CONTEXT
-        # ("confidence modifier only").
+        # The prior flat-layout build classified this NOISE — §7 locks it
+        # CONTEXT ("confidence modifier only").
         assert classify("BULL_BOS") == TIER_CONTEXT
         assert classify("BEAR_BOS") == TIER_CONTEXT
 
