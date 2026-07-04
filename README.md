@@ -1,48 +1,104 @@
-# Absolute Dollar Agent — TRON / TradersMind
+# Absolute Dollar Agent (ADA)
+## Just a Really Very Intelligent Sidekick
 
-A glassbox trading system for Deriv. **TRON** detects on the price grid in Pine Script and emits nothing but signal. **TradersMind** receives, classifies, narrates, remembers, and executes — with a human tap today, autonomously later, always under a risk governor.
+A glassbox trading system for Deriv. **TRON** detects on the price grid in
+Pine Script and emits nothing but signal. **ADA** — codename `tradersmind/`
+in this repo — receives, classifies, narrates, remembers, sizes, and
+executes. A human taps today; autonomy comes later, always under a risk
+governor.
 
-No blackbox. Every signal TradersMind acts on can be traced back to the exact TRON filters that fired.
+No blackbox. Every action ADA takes traces back to a named TRON field.
 
-## Architecture
+---
+
+## Repo Structure
 
 ```
-TradingView (TRON, Premium)
-        │  JSON webhook — engine: TRON_GBX_v3
-        ▼
-TradersMind (FastAPI) → mind/router classifies EXECUTE/CONTEXT/NOISE
-        │                → SQLite episodic memory (signals, trades, governor log)
-        ▼
-Telegram — tap-to-execute cards + status/risk/history
-        │
-        ▼
-Deriv Bulk Purchase REST — Vanilla Options / Rise-Fall / Multipliers, demo or live
+TRON_Glassbox_SignalGenerator.pine   ← TRON, the Brain. Pine Script. Load on TradingView.
+                                        Never modified by the backend build (locked doctrine).
+
+tradersmind/                         ← ADA, the Sidekick. One folder, the only deployed system.
+├── tron/                              webhook receiver, 18-signal models, validator
+├── mind/                              classifier + router, episodic memory, narrative engine
+├── governor/                          sizing law + hard risk limits, live-mode gate
+├── bridge/                            Deriv execution client, contract mapper
+├── body/                              Telegram — tap-to-execute, status/risk/history
+├── face/                              web dashboard
+├── config/settings.yaml               narrative templates, risk band, router rules
+├── tests/                             31 tests, all passing
+└── README.md                          run instructions + build status for this tree
+
+docs/
+└── TRON_ALERTS_GUIDE.md              ← operator's guide to reading TRON's alerts
+                                        (signal hierarchy, masterclass, dashboard reference)
+
+CLAUDE.md                             ← master build spec, doctrine, and the full
+                                        verification/rebuild/purge/rebrand log (§20–23)
+README.md                             ← you are here
 ```
 
-TRON has no idea what account it's trading, what already happened, or what a dollar is — it only reads price, one asset at a time, and says so. TradersMind is the only thing that knows about capital, risk, and history. That split is deliberate: it's what keeps TRON simple enough to trust and TradersMind smart enough to be worth building.
+One Pine file. One Python tree. One doctrine document. Nothing else.
 
-## What's in this repo
+---
 
-| Path | What it is |
+## Status — verified against CLAUDE.md today, section by section
+
+Nothing has placed a confirmed real order yet — that's what today's Replit
++ Telegram test is for. Everything below was checked against the actual
+code in this repo just now, not assumed from memory.
+
+### ✅ Built and verified (tests pass, or hand-verified against a mocked Deriv client)
+
+| Spec section | What's confirmed working |
 |---|---|
-| `TRON_Glassbox_SignalGenerator.pine` | TRON — the only Pine Script in this repo. Load this on TradingView. |
-| `tradersmind/` | **The deployed system.** Layered `tron/mind/bridge/governor/body/face` build — see `tradersmind/README.md` to run it. `.replit` points here. |
-| `TRON_JARVIS/README.md` | Operator's guide to TRON's alerts — signal hierarchy, how to read every alert type, dashboard reference. |
-| `CLAUDE.md` | The master build spec and its verification/rebuild log — read this first. |
+| §6 Webhook Contract | `POST /webhook/tron?key=SECRET` — exact match, always checked. Rejects malformed/unauthorized payloads. |
+| §7 18-Signal Classification | `mind/router.py` classifies all 18 signal types EXECUTE/CONTEXT — 1:1 tested. Same-bar flip-priority suppression (H4 > MTF > TRAIL) enforced. |
+| §8 Routing Matrix | All three flagged open decisions asked and answered (fixed style-priority list, zone breaks stay CONTEXT permanently, entries tap-executable to Rise/Fall as override). |
+| §9 Signal Flow | Full pipeline wired: validate → classify → narrate → remember → size → route → tap or auto-execute → ledger. |
+| §10 RiskGovernor | Sizing law ($0.35–$1.00 confidence-scaled) plus every hard limit ($5 ceiling, $50 daily loss, 3-loss streak, 5-min cooldown, 85%/4-sync auto-gate, 10%-of-balance cap). 100-demo-trade live-mode gate enforced at boot, not just documented — refuses to start in `live` below threshold. |
+| §13 Narrative Engine | Template-based, zero LLM, all 18 signal types have a matching template (a real bug where this crashed on every non-SNIPER signal was found and fixed while verifying). |
+| §14 Episodic Memory | SQLite ledger logs every signal (CONTEXT included), with `tier`/`env`/`executed`/`contract_id` columns to distinguish "signal seen" from "order placed." |
+| §5/§18 No paper mode | `TRADING_MODE` is `demo`/`live` only, everywhere — confirmed via repo-wide search, zero `paper` branches remain. |
+| §15 (partial) Risk panel | Telegram `/risk` now reports the live demo-trade counter (`N/100`) toward the live-mode gate — this was missing until today's pass. |
 
-The earlier `jarvis/` build (flat layout, proved the Deriv Bulk Purchase execution path) has been purged — its classifier and Deriv-bridge logic was already ported into `tradersmind/` (see `CLAUDE.md` §21). It's still recoverable from git history if needed.
+### ⚠️ Built but incomplete — don't mistake these for done
 
-## Status
+| What | The gap |
+|---|---|
+| §14 KNN similarity | `mind/similarity.py`'s `SimilarityEngine` is instantiated in `main.py` but **never called**. The sizing law's edge signal today comes from a simpler win-rate query (`get_stats_by_signal_type`), not true KNN feature-vector matching. |
+| §16 Deriv Bridge | Bulk Purchase REST client is implemented and structurally matches the endpoint's real field names — but has **not** placed a real order in this session (no live credentials in this environment). Today's test is the first real check. |
+| §15 Web dashboard | `face/` exists (session stats, live signal feed, TradingView embed) but is not the chart-centric UI with TRON markers overlaid on price that §15 specifies. |
 
-Nothing is live yet. TRON's detection engine is finished and unmodified. `tradersmind/` has the full pipeline (classify → narrate → remember → size → route) working end-to-end against a mocked Deriv client and passing its test suite, but has **not** placed a confirmed real order — that requires deploying it with real Deriv/Telegram credentials. See `CLAUDE.md` §21 for exactly what was rebuilt and what's still a known gap.
+### ❌ Not built — explicit gaps, not silent omissions
 
-## Quickstart
+- Chart-centric UI with TRON signal markers on price (§15)
+- Cross-signal confidence modifiers from CONTEXT signals onto a co-occurring EXECUTE signal (§7)
+- LightGBM edge model (§14 — needs 50–70 logged episodes first, by design)
+- OAuth2 + PKCE Deriv upgrade — balance checks, live quotes, settlement watching (§16)
+- Multi-pair agent loader, Telegram Mini App (post-MVP roadmap, §17)
+
+---
+
+## Quickstart — for today's Replit + Telegram test
 
 1. Load `TRON_Glassbox_SignalGenerator.pine` on a TradingView chart (Premium plan, for reliable webhooks).
-2. Stand up TradersMind: follow `tradersmind/README.md` (server, `.env`, the one TradingView alert you need).
-3. Point the alert's webhook at your running instance: `https://your-host/webhook/tron?key=SECRET`.
-4. Start on `TRADING_MODE=demo`, `AUTO_EXECUTE=false` — tap-to-trade only until the ledger earns more (100 completed demo trades before `live` unlocks at all).
+2. On Replit: Secrets must match `tradersmind/.env.example` — notably `DERIV_ACCOUNT_ID`, which the real Bulk Purchase endpoint requires but wasn't in the original spec's env list.
+3. Deploy (`.replit` already points at `tradersmind/`) and confirm the boot log shows `Mode: DEMO` and `Live-mode gate cleared` is **not** printed (you're not in live mode yet).
+4. Point the TradingView alert webhook at `https://your-replit-url/webhook/tron?key=YOUR_SECRET`.
+5. Message your Telegram bot once (registers you as the operator), then try `/status`, `/risk`, `/history` to confirm it's reading real state, not placeholders.
+6. Wait for (or force) a TRON signal and confirm: CONTEXT-tier signals arrive with no buttons, EXECUTE-tier signals arrive with tap buttons, and a tap actually reaches Deriv.
 
-## Broker & contracts
+## Broker & Contracts
 
-Deriv only. Vanilla Options is primary; Rise/Fall and Multipliers are both wired through the same execution pipeline. Multipliers cover the "perpetuals" use case, so there's no second exchange to integrate — one pipeline, one broker.
+Deriv only. Vanilla Options, Rise/Fall, and Multipliers all route through
+the same Bulk Purchase REST client — one pipeline, one broker, no
+third-party bots anywhere in the bridge.
+
+## Where to Read Next
+
+- **`CLAUDE.md`** — the master spec, doctrine, and the complete history of
+  what was verified, rebuilt, purged, and rebranded (§20–23).
+- **`tradersmind/README.md`** — how to run ADA, its architecture, and its
+  own up-to-date built/not-built list.
+- **`docs/TRON_ALERTS_GUIDE.md`** — what each TRON alert means and how to
+  act on it, independent of whichever backend is deployed.

@@ -85,6 +85,7 @@ class TradersMind:
             chat_id=os.getenv("TELEGRAM_CHAT_ID", ""),
             governor=self.governor,
             memory=self.memory,
+            demo_trades_required=self.demo_trades_required,
         )
         self.telegram.set_callbacks(
             on_execute=self.handle_telegram_execute,

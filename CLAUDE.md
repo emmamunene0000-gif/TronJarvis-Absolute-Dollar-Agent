@@ -55,7 +55,7 @@ TRON (TradingView, Pine Script) → Webhook → ADA Backend (Replit)
 ## 2. Doctrine — Non-Negotiable Engineering Constraints
 
 1. **The Sidekick never invents a signal.** All trade triggers originate from TRON's webhook. No independent technical analysis in the backend.
-2. **Not "my Jarvis" — TRON's Jarvis.** The backend is an execution arm, not a second opinion.
+2. **Not "my Sidekick" — TRON's Sidekick.** The backend is an execution arm, not a second opinion. [Edited 2026-07-04 §23: originally read "Not 'my Jarvis' — TRON's Jarvis" — operator instruction to drop the Jarvis name entirely, meaning unchanged.]
 3. **Load on the pair, then wait.** The agent is instantiated per traded pair and does nothing until a TRON webhook arrives for that pair.
 4. **Glass box, not black box.** Every action traces to a named TRON factor (`sync_layers=4`, `vwap=BULL`, `confidence=86`). No opaque "AI decided" messaging anywhere.
 5. **Operator sets risk, RiskGovernor does the rest.** The operator picks a risk profile once; sizing and guardrails run autonomously from there.
@@ -531,3 +531,59 @@ turns out to be needed.
   that `jarvis/` is recoverable from history.
 - `.replit` was already pointed at `tradersmind/` from §21 — unaffected by
   this purge.
+
+---
+
+## 23. Rebrand + Reorg (2026-07-04, same day) — no more "Jarvis" anywhere active
+
+Operator instruction: stop using the name "Jarvis" anywhere in this repo —
+the product is **Absolute Dollar Agent (ADA) — Just a Really Very
+Intelligent Sidekick**. Distinguished from history: §20–22 above are a
+dated audit trail of a system that was actually named Jarvis at the time;
+rewriting those entries to hide that name would falsify the record, so they
+were left untouched. Everything a reader or operator actually uses today
+was cleaned instead:
+
+- **`TRON_JARVIS/` directory renamed** — its one file (the operator's guide
+  to reading TRON's alerts) moved to `docs/TRON_ALERTS_GUIDE.md`. Root
+  `README.md`'s file table updated to match.
+- **Remaining "jarvis" wording in active docs/code reworded** to generic
+  provenance language ("the prior flat-layout build") without losing the
+  engineering reasoning it was attached to: `tradersmind/README.md`,
+  `mind/router.py`'s docstring, `tests/test_router.py`'s comments,
+  `bridge/deriv_client.py`'s docstring, `docs/TRON_ALERTS_GUIDE.md`, and
+  root `README.md`.
+- **§2 doctrine point 2 edited** — "Not 'my Jarvis' — TRON's Jarvis"
+  became "Not 'my Sidekick' — TRON's Sidekick," same meaning. This is the
+  one edit to the originally-locked §0–19 spec text in this whole log;
+  flagged inline at the edit site rather than silently changed, since the
+  operator who locked that line is the same one now asking to change it.
+- **A dangling reference fixed**: `bridge/deriv_client.py`'s docstring cited
+  `SYSTEM_DIAGNOSTIC.md §4` for the Deriv legacy-API-retirement fact — that
+  file was deleted in §22. Repointed to `CLAUDE.md §20`, which already
+  carries the same fact.
+- **A real gap found while re-verifying the repo against this spec, not
+  fixed in this pass**: `mind/similarity.py`'s KNN engine
+  (`SimilarityEngine.find_similar`, `TradeEpisode.feature_vector`) is
+  instantiated in `main.py` (`self.similarity = SimilarityEngine(k=5)`) but
+  never called anywhere in `_process_signal`. The sizing law's edge signal
+  today comes from `mind/memory.py`'s `get_stats_by_signal_type()` — a
+  plain symbol+signal-type win-rate query — not the KNN feature-vector
+  matcher §14 describes. Both facts are now stated plainly in
+  `tradersmind/README.md`'s "What's Not Built Yet" rather than left to look
+  done because the module exists.
+- **One spec gap closed**: §15 calls for "a live demo-trade counter toward
+  the 100-trade gate" in the risk panel. It was enforced at boot (main.py
+  refuses `TRADING_MODE=live` below the threshold) but never surfaced
+  anywhere an operator could see progress toward it. `body/telegram_bot.py`'s
+  `/risk` command now reports `N/100 completed demo trades` by querying
+  `memory.count_completed_trades()` directly.
+- **Not renamed**: the `tradersmind/` folder itself keeps its name. It
+  matches this spec's own working name ("ADA / TradersMind") verbatim, and
+  a folder rename was judged lower-value than getting the branding/wording
+  cleanup done before the operator's imminent Replit + Telegram test — a
+  wrong or rushed rename right before a deploy adds risk for no functional
+  gain. Open for the operator to request explicitly later.
+- Full test suite (31 tests) re-run after every edit in this section;
+  `TradersMind()` construction and the Telegram bot's new
+  `demo_trades_required` wiring verified by hand.

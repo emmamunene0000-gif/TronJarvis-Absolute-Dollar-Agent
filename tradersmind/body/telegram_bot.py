@@ -20,11 +20,12 @@ class TradersMindBot:
     handles tap-to-execute. Reads live Governor/Memory state — it doesn't
     hold its own copy of the truth."""
 
-    def __init__(self, token: str, chat_id: str, governor, memory):
+    def __init__(self, token: str, chat_id: str, governor, memory, demo_trades_required: int = 100):
         self.token = token
         self.chat_id = chat_id
         self.governor = governor
         self.memory = memory
+        self.demo_trades_required = demo_trades_required
         self.app: Optional[Application] = None
         # episode_id -> raw signal dict, kept only long enough to render buttons
         self.pending_signals: dict[int, dict[str, Any]] = {}
@@ -78,6 +79,7 @@ class TradersMindBot:
     async def cmd_risk(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         p = self.governor.profile
         status = self.governor.get_status()
+        demo_trades = await self.memory.count_completed_trades(env="demo")
         await update.message.reply_text(
             f"RISK GOVERNOR\n"
             f"Sizing band: ${p.min_stake:.2f}–${p.max_dynamic_stake:.2f} "
@@ -88,7 +90,9 @@ class TradersMindBot:
             f"Auto-execute gate: confidence>={p.min_confidence_for_auto}% "
             f"and sync={p.min_sync_layers_for_auto}/4\n\n"
             f"Cooldown active: {status['cooldown_active']}\n"
-            f"State: {status['state']}"
+            f"State: {status['state']}\n\n"
+            f"Live-mode gate: {demo_trades}/{self.demo_trades_required} "
+            f"completed demo trades"
         )
 
     async def cmd_history(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

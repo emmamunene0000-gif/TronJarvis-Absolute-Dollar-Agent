@@ -9,12 +9,13 @@ place that decides what a TRON signal is allowed to do:
               whitelist in tron/models.py maps entirely onto EXECUTE/CONTEXT,
               kept here for a signal type TRON might add later)
 
-Two locked-spec resolutions applied here, both settled against jarvis's
-already-shipped classifier which disagreed with this spec:
+Two locked-spec resolutions applied here, both settled against an earlier
+classifier (from the prior flat-layout build this system replaced) that
+disagreed with this spec:
   - SNIPER_CALL/PUT classified CONTEXT (dormant unless show_zones), not
-    EXECUTE as jarvis had it.
+    EXECUTE as the prior build had it.
   - BULL_BOS/BEAR_BOS classified CONTEXT ("confidence modifier only"), not
-    NOISE as jarvis had it.
+    NOISE as the prior build had it.
 """
 from dataclasses import dataclass
 from typing import Optional

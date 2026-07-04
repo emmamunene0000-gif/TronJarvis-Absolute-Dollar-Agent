@@ -7,7 +7,7 @@ masterclass, and a per-alert-type action protocol. It documents TRON itself
 
 For current architecture, doctrine, and build status, see `/CLAUDE.md`
 (the master spec) and `/tradersmind/README.md` (the deployed system). This
-file used to also describe the "JARVIS" execution backend that has since
+file used to also describe an earlier execution backend that has since
 been superseded by `tradersmind/` — that material has been removed here to
 avoid two docs disagreeing about a system that no longer exists.
 
