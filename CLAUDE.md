@@ -418,3 +418,116 @@ This section is not part of the locked doctrine above. It is the record of compa
 4. **One doctrine disagreement between this spec and the already-shipped classifier:** `jarvis/app/parser.py` classifies `SNIPER_CALL`/`SNIPER_PUT` as `EXECUTE` (and auto-whitelists them), while this spec's §7 classifies Sniper signals as **CONTEXT**, dormant unless `show_zones` is on. Whichever implementation is carried forward needs this resolved explicitly, not inherited by default.
 
 **None of the above was fixed as part of writing this file — this is the verification record called for in §0, surfaced for an explicit decision on which tree (`jarvis/` hardened to match §4's layering, or `tradersmind/` fixed to drop paper mode + add the router + swap to the REST bridge) becomes the one deployed system before wiring the TradingView MVP alert.**
+
+---
+
+## 21. Rebuild Log (2026-07-04, same day) — `tradersmind/` is now the one tree
+
+Operator decision: rebuild `tradersmind/` into the single deployed tree,
+porting `jarvis/`'s proven logic into it, rather than hardening `jarvis/`'s
+flat layout or starting over. `.replit` now points at `tradersmind/`.
+**`jarvis/` has not been deleted yet** — it stays until a real demo trade is
+confirmed through the rebuilt `tradersmind/` on the operator's own Replit
+deployment, per the "purge only after verified working" instruction.
+
+What changed, resolving every item in §20's mismatch list:
+
+- **Paper mode removed entirely.** `TRADING_MODE` is `demo` or `live` only,
+  everywhere (`main.py`, `bridge/deriv_client.py`, `face/app.py`,
+  `body/telegram_bot.py`, `README.md`, `.env.example`). Invalid values fall
+  back to `demo` with a logged warning, never silently to a simulated fill.
+- **New `mind/router.py`** implements the §7 classifier and §8 routing
+  matrix that didn't exist before. Two locked-spec resolutions against
+  jarvis's disagreeing classifier: `SNIPER_*` → CONTEXT (jarvis had
+  EXECUTE), `BULL_BOS`/`BEAR_BOS` → CONTEXT (jarvis had NOISE — a second
+  disagreement not caught in §20's original pass). Same-bar flip-priority
+  suppression (H4 > MTF > TRAIL) is enforced via `mind/memory.py`'s new
+  `recent_signals_same_bar()`.
+- **§8's three blocking open decisions were asked and answered** before the
+  router was wired (not resolved silently): fixed operator-configured style
+  priority (`config/settings.yaml` → `router.style_priority`, default
+  vanilla > multiplier > rise_fall) for the Vanilla/Multiplier tie *and*
+  generalized to cover `TRAIL_FLIP_*`'s three-way fit, which the matrix
+  table doesn't explicitly flag as ambiguous but structurally is; zone
+  breaks stay CONTEXT permanently even if Liquidity Zones are enabled later;
+  `CALL_ENTRY`/`PUT_ENTRY` are tap-executable to Rise/Fall as a manual
+  override alongside their auto-routed style.
+- **`bridge/deriv_client.py` rewritten** onto the same Bulk Purchase REST
+  fast path jarvis proved against the live API (`httpx`, `underlying_symbol`,
+  `VANILLALONGCALL`/`CALL`/`MULTUP` contract types) — the old
+  WebSocket-to-a-dead-endpoint implementation and its unfinished buy stubs
+  are gone. `contract_status()` raises honestly rather than pretending to
+  poll settlement, matching jarvis's documented limitation.
+- **Governor sizing law rewritten** to the actual $0.35–$1.00
+  confidence/edge-scaled band from §10, replacing the flat
+  $5-base-±20%-by-win-rate logic. Hard ceiling, daily loss, streak, and
+  auto-gate checks were already correct and are unchanged. Added
+  `can_unlock_live_mode()` — `main.py` now hard-refuses to boot with
+  `TRADING_MODE=live` until 100 completed (`WIN`/`LOSS`), actually
+  *executed* demo trades exist in the ledger (`mind/memory.py` gained
+  `executed`/`env`/`contract_id` columns and `count_completed_trades()` to
+  make that distinction — the old schema couldn't tell "signal logged" from
+  "order placed"). `operator_override()` now requires an `operator_id`.
+- **Webhook auth fixed** to §6's `POST /webhook/tron?key=SECRET`, always
+  checked — replacing the optional, default-off `X-TRON-Signature` header.
+- **A real, previously-undetected bug fixed along the way**: `mind/narrative.py`'s
+  template lookup used `signal.lower()` but `config/settings.yaml`'s
+  template keys didn't match TRON's actual signal names for all but one
+  case, and the fallback template referenced a `{bias}` field that was
+  never passed to `.format()`. Every non-SNIPER signal crashed the
+  processor before this fix — confirmed by running the pipeline end-to-end,
+  not just by reading the code. All 18 signal types now have a matching
+  template key.
+- `requirements.txt` trimmed of `websockets`, `sqlalchemy`, `aiohttp`,
+  `apscheduler`, `pydantic-settings` — none were imported anywhere; added
+  `httpx` and `pyyaml`, which were used but missing.
+- Added `tests/test_router.py` and extended `tests/test_governor.py` for
+  the new sizing law and live-mode gate. Full suite (31 tests) passes.
+  End-to-end pipeline behavior (EXECUTE routing, CONTEXT narration, same-bar
+  suppression, webhook auth, live-mode refusal, tap-execute round trip) was
+  additionally verified by hand against a mocked Deriv client — not just
+  unit-tested in isolation.
+
+**Not fixed in this pass, left as explicit gaps** (see `tradersmind/README.md`
+→ "What's Not Built Yet"): the §15 chart-centric UI with TRON markers
+overlaid on price (`face/` is still a stats panel + generic embed), §7's
+cross-signal confidence-modifier propagation from CONTEXT onto a
+co-occurring EXECUTE signal, the LightGBM edge model, and the OAuth2+PKCE
+Deriv upgrade (balance checks, live quotes, settlement watching). These are
+later build-sequence phases (§17), not doctrine violations, and weren't
+invented or faked to look done.
+
+---
+
+## 22. Purge (2026-07-04, same day) — jarvis/ and jarvis-era docs removed
+
+Operator decision: purge now, before the first Replit deployment, rather
+than waiting for a confirmed live demo trade through `tradersmind/` first
+(the original plan in §21). Recoverable from git history if anything here
+turns out to be needed.
+
+- **`jarvis/` deleted entirely** — its classifier and Deriv-bridge logic was
+  already ported into `tradersmind/` in §21; nothing in it was still load-bearing.
+- **`SYSTEM_DIAGNOSTIC.md` deleted** — a session-specific jarvis bug log;
+  the facts that still matter (the Deriv legacy-API retirement, the
+  `underlying_symbol` field-name fix) are already captured in §20 above and
+  in `tradersmind/bridge/deriv_client.py`'s docstring.
+- **`TRON_JARVIS/README.md` kept, de-referenced** — its signal hierarchy,
+  detection-engine table, trail-flip masterclass, and per-alert-type
+  operator protocol describe TRON itself, not jarvis's code, so it wasn't
+  "not to be used" the way jarvis/'s code was. Cut instead: the "Two
+  entities, one organism" vision section (described an LLM-narrated,
+  MT5-bridged Jarvis that doctrine explicitly forbids — zero LLM in the
+  narrator, Deriv only, no third-party bridges), the Project Files listing
+  of jarvis/'s file tree, and the Build Sequence checklist tracking jarvis's
+  phases. Replaced with short pointers to `/CLAUDE.md` and
+  `/tradersmind/README.md` so build status lives in exactly one place.
+- **`TRON_Glassbox_SignalGenerator.pine`'s STEP 17 comment block** updated
+  to name TradersMind instead of Jarvis and stop pointing at deleted
+  `jarvis/app/parser.py` / `jarvis/README.md` paths. Comment-only change —
+  no detection logic touched, per §18's guardrail.
+- `.gitignore`'s dead `jarvis/jarvis.db` line removed; root `README.md`
+  rewritten to describe TradersMind as the system, not Jarvis, with a note
+  that `jarvis/` is recoverable from history.
+- `.replit` was already pointed at `tradersmind/` from §21 — unaffected by
+  this purge.

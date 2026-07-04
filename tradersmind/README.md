@@ -1,18 +1,20 @@
-# 🤖 TradersMind
+# TradersMind
 ## Just a Really Very Intelligent Sidekick
-### Trading Augmented Intelligence (DSS — Decision Support System)
+
+This is the one deployed tree for ADA/TradersMind — see `/CLAUDE.md` §20 for
+why `jarvis/` existed in parallel and what got ported from it into here.
 
 ---
 
 ## What This Is
 
-TradersMind is the **execution arm** of TRON — your Pine Script glassbox signal generator. 
+TradersMind is the **execution arm** of TRON — your Pine Script glassbox signal generator.
 
 - **TRON** detects (math, instinct, zero hallucination)
-- **TradersMind** executes (reason, memory, narrative, interface)
+- **TradersMind** classifies, narrates, remembers, sizes, and (if authorized) executes
 - **Risk Governor** protects (your money is the business)
 
-TRON emits JSON webhooks. TradersMind receives, narrates, remembers, decides, and trades.
+TRON emits JSON webhooks. TradersMind is the only thing that ever acts on them.
 
 ---
 
@@ -21,21 +23,25 @@ TRON emits JSON webhooks. TradersMind receives, narrates, remembers, decides, an
 ```
 TRON (TradingView) → Webhook → TradersMind (Replit)
                                             │
-    ┌───────────────┬───────────────┬───────┴───────┐
-    ▼               ▼               ▼               ▼
- Webhook          Memory        Narrative          Risk
- Receiver        (SQLite)      Engine            Governor
-    │               │               │               │
-    └───────────────┴───────┬───────┴───────────────┘
-                            ▼
-                    Deriv Bridge
-                    (WebSocket API)
-                            │
-                    ┌───────┴───────┐
-                    ▼               ▼
-               Telegram         Web Dashboard
-               Mini App        (Real-time)
+              ┌──────────────┬─────────────┴──────────────┐
+              ▼              ▼                             ▼
+        tron/webhook    mind/router              mind/memory + narrative
+        (validate)   (classify EXECUTE/          (episodic ledger,
+                       CONTEXT + route            deterministic narrator)
+                       to a contract style)
+              │              │                             │
+              └──────────────┴──────────┬──────────────────┘
+                                         ▼
+                              governor/risk_engine
+                              (sizing law + hard limits)
+                                         │
+                                 ┌───────┴───────┐
+                                 ▼               ▼
+                          body/ (Telegram)  bridge/ (Deriv REST)
+                          tap-to-execute    real order, demo or live
 ```
+
+`face/` runs alongside as a read-only web dashboard.
 
 ---
 
@@ -43,34 +49,35 @@ TRON (TradingView) → Webhook → TradersMind (Replit)
 
 | Layer | File | Purpose |
 |-------|------|---------|
-| **TRON** | `tron/` | Models, validator, webhook receiver |
-| **Mind** | `mind/` | SQLite memory, narrative engine, KNN similarity |
-| **Bridge** | `bridge/` | Deriv WebSocket client, contract mapper |
-| **Governor** | `governor/` | Risk rules, stake sizing, cooldowns, limits |
-| **Body** | `body/` | Telegram bot, signal cards, tap-to-execute |
-| **Face** | `face/` | Web dashboard, TradingView embed, live P&L |
+| **TRON** | `tron/` | Pydantic models (18-signal whitelist), validator, webhook receiver |
+| **Mind** | `mind/` | Signal Router (classify + route), SQLite episodic memory, narrative engine, KNN similarity |
+| **Bridge** | `bridge/` | Deriv Bulk Purchase REST client, contract mapper |
+| **Governor** | `governor/` | Sizing law + hard limits, cooldowns, live-mode gate |
+| **Body** | `body/` | Telegram bot — tap-to-execute cards, live status/risk/history |
+| **Face** | `face/` | Web dashboard (TradingView embed, session stats) |
 
 ---
 
 ## Quick Start
 
-### 1. Clone & Setup
+### 1. Setup
 ```bash
-git clone <repo>
 cd tradersmind
 pip install -r requirements.txt
 cp .env.example .env
 ```
 
 ### 2. Configure `.env`
+See `.env.example` for the full list. The essentials:
 ```env
-TRADING_MODE=paper          # paper | demo | live
-AUTO_EXECUTE=false          # NEVER true until 100 demo trades
+TRADING_MODE=demo           # demo | live — there is no paper mode
+AUTO_EXECUTE=false
 WEBHOOK_SECRET=your_secret
 TELEGRAM_BOT_TOKEN=your_token
 TELEGRAM_CHAT_ID=your_chat_id
 DERIV_APP_ID=your_app_id
 DERIV_API_TOKEN=your_demo_token
+DERIV_ACCOUNT_ID=your_deriv_account_id   # required by the Bulk Purchase endpoint
 ```
 
 ### 3. Run
@@ -79,27 +86,53 @@ python main.py
 ```
 
 ### 4. Connect TRON (TradingView)
-In TRON Pine Script alert:
-- **Webhook URL**: `https://your-replit-url/webhook/tron`
+- **Webhook URL**: `https://your-replit-url/webhook/tron?key=your_secret`
 - **Message**: `{{alert_message}}`
+- **Condition**: Any alert() function call, frequency = Once Per Bar Close
 
 ---
 
-## Signal Flow
+## Signal Flow (§9)
 
-1. TRON detects signal → emits JSON webhook
-2. TradersMind validates → stores in memory → generates narrative
-3. Risk Governor checks limits → approves/rejects
-4. If approved: broadcasts to Telegram + Web Dashboard
-5. Operator taps **EXECUTE** (or auto-executes if enabled + high confidence)
-6. Deriv Bridge fires contract → returns ticket
-7. Live P&L streams to Telegram + Dashboard
-8. Trade closes → result stored in episodic memory
-9. Next signal: memory suggests stake adjustment based on similar history
+1. TRON detects a signal on bar close → emits JSON webhook.
+2. `tron/webhook.py` checks `?key=` and validates against the §6 schema.
+3. `mind/router.py` classifies EXECUTE / CONTEXT / NOISE and, for EXECUTE
+   signals, resolves which enabled contract style it auto-routes to.
+4. `mind/narrative.py` generates a deterministic narrative; `mind/memory.py`
+   logs the episode regardless of tier — CONTEXT signals included.
+5. CONTEXT signals stop here — narrated and logged, never executed.
+6. EXECUTE signals go through `governor/risk_engine.py`: hard limits first,
+   then the $0.35–$1.00 sizing law scaled by confidence/edge.
+7. Approved signals broadcast a tap card to Telegram. AUTO mode also fires
+   automatically if confidence ≥85% and sync=4/4 (a hard gate, not a
+   sizing input — anything below drops to TAP even with AUTO on).
+8. `bridge/deriv_client.py` places a real order against the Deriv demo or
+   live balance via the Bulk Purchase REST endpoint, returns a contract ID.
+9. Result settles → ledger updated → counts toward the 100-trade live gate.
 
 ---
 
-## Risk Governor Rules (Hard-Coded)
+## The Deriv Bridge — Honest Limitation
+
+`bridge/deriv_client.py` does **not** implement the persistent WebSocket
+bridge CLAUDE.md §1/§12 describe. Deriv retired the legacy WebSocket API for
+this account (`GET /trading/v1/options/legacy/migration-status` → `"complete"`).
+Every Personal Access Token fails `InvalidToken` against `wss://ws.derivws.com`
+regardless of app_id. Instead, TradersMind buys through the **Bulk Purchase
+REST endpoint** — direct buy, no pre-quote, no balance lookup, no settlement
+polling. `contract_status()` raises rather than pretending to track a
+contract it structurally can't. Restoring the full flow needs interactive
+OAuth2 + PKCE login — tracked as future work, not part of this build.
+
+---
+
+## Risk Governor (§10)
+
+**Sizing law** (what the Governor actually charges): stake is sized
+dynamically between **$0.35 and $1.00**, scaled by confidence and,
+once episodes accumulate, the memory model's edge signal.
+
+**Hard limits** (never exceeded, nest around the sizing law):
 
 | Rule | Default | Override? |
 |------|---------|-----------|
@@ -111,66 +144,57 @@ In TRON Pine Script alert:
 | Min sync layers for auto | 4/4 | ❌ No |
 | Max 10% balance per trade | — | ❌ No |
 
----
-
-## Trading Modes
-
-| Mode | Description | Best For |
-|------|-------------|----------|
-| **Rise/Fall** | Direction + duration only | Quick scalps, high frequency |
-| **Vanilla** | Strike + expiry + direction | Defined risk, higher payouts |
-| **Multiplier** | Direction + leverage + SL/TP | Trend riding, compound gains |
+**Live-mode gate**: `main.py` refuses to start with `TRADING_MODE=live`
+until `mind/memory.py`'s ledger shows 100 completed (`WIN`/`LOSS`), actually
+*executed* demo trades — not just signals seen. Hard gate, no override.
 
 ---
 
-## Episodic Memory Schema
+## Signal Classification (§7) — resolved against jarvis's disagreement
 
-Every trade stores:
-- Full TRON context (fractal state, indicators, confidence)
-- Execution details (stake, ticket, entry price)
-- Result (P&L, win/loss, time to resolution)
-- Feature vector for KNN similarity search
+`mind/router.py` locks two calls this spec makes differently than the
+jarvis/ tree it was ported from:
+- `SNIPER_CALL`/`SNIPER_PUT` → **CONTEXT** (jarvis had these as EXECUTE)
+- `BULL_BOS`/`BEAR_BOS` → **CONTEXT** (jarvis had these as NOISE)
 
-Queries supported:
-- "Find similar setups" → KNN on indicator vector
-- "H4 FLIP performance" → Filter by signal type
-- "London session stats" → Group by hour
-- "Streak detection" → Flag unstable regimes
+Same-bar flip suppression is enforced: a fired `MTF_FLIP_*`/`TRAIL_FLIP_*`
+downgrades to CONTEXT if a higher-priority flip (`H4_FLIP_*` > `MTF_FLIP_*`
+> `TRAIL_FLIP_*`) already fired for that symbol on the same TRON bar.
 
 ---
 
-## Narrative Engine (Zero LLM)
+## Routing Matrix (§8) — operator defaults locked
 
-Template-based, deterministic storytelling:
+- `CALL_ENTRY`/`PUT_ENTRY` and the flip signals fit more than one enabled
+  style (Vanilla/Multiplier, sometimes Rise/Fall too). `config/settings.yaml`
+  → `router.style_priority` is a fixed ranked list; first enabled style
+  wins. Default: `vanilla` > `multiplier` > `rise_fall`.
+- `CALL_ZONE_BREAK`/`PUT_ZONE_BREAK` stay CONTEXT permanently, even if
+  Liquidity Zones are enabled in TRON later — never an independent trade.
+- `CALL_ENTRY`/`PUT_ENTRY` are also tap-executable to Rise/Fall as a manual
+  override, even though the auto-router never picks it for them.
 
-> "SOVEREIGN CALL — H4 flipped BULL. All 4 layers aligned. Confidence 87%. Strike 314.50 ATM. Expiry 8m. Similar setups won 72% historically. Risk Governor approves max stake."
-
-No hallucination. Every word traceable to TRON's JSON fields.
-
----
-
-## Safety First
-
-- **Default**: Paper trading + manual tap-to-execute
-- **Auto-execute**: Requires `AUTO_EXECUTE=true` + confidence ≥85% + sync=4/4
-- **Demo gate**: 100 demo trades required before live mode unlock
-- **All overrides logged**: Operator can bypass, but every bypass is recorded
+Change `router.enabled_styles` in `config/settings.yaml` to turn a trading
+style on or off.
 
 ---
 
-## Roadmap
+## What's Not Built Yet
 
-- [x] v1.0: Webhook → Memory → Narrative → Telegram → Paper trades
-- [ ] v1.1: Live Deriv execution + WebSocket P&L streaming
-- [ ] v1.2: Web dashboard with real-time chart + stats
-- [ ] v1.3: LightGBM predictive module + dynamic stake sizing
-- [ ] v1.4: Multi-pair agent loader + portfolio heat map
-- [ ] v1.5: Telegram Mini App (native buttons, no webview)
+Scoped out of this pass, tracked for later build-sequence phases (§17):
+- Chart-centric UI with TRON signal markers overlaid on price (`face/`
+  today is a session-stats panel + generic TradingView embed, not the
+  glassbox chart §15 calls for).
+- Cross-signal confidence modifiers from CONTEXT signals onto a
+  co-occurring EXECUTE signal (§7's "raises/lowers confidence" note).
+- LightGBM edge model (needs 50–70 logged episodes first).
+- OAuth2 + PKCE Deriv login (balance checks, live quotes, settlement
+  watching).
 
 ---
 
 ## License
 
-MIT — Built for traders who think.
+MIT.
 
 **TRON detects. TradersMind executes. Governor protects.**

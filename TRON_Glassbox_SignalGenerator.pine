@@ -1529,18 +1529,18 @@ else if not dashOn and not na(dashTable)
     prevPlace := ""
 
 // =========================================================================
-// STEP 17: ALERTS — JSON webhook emitter for Jarvis
+// STEP 17: ALERTS — JSON webhook emitter for TradersMind
 //
 // TradingView Alert setup (ONE alert, not one per signal):
 //   Condition    = TRON — GLASSBOX SIGNAL GENERATOR → "Any alert() function call"
 //   Message      = {{alert_message}}
-//   Webhook URL  = https://YOUR_JARVIS_HOST/webhook/tron?key=YOUR_WEBHOOK_SECRET
+//   Webhook URL  = https://YOUR_HOST/webhook/tron?key=YOUR_WEBHOOK_SECRET
 //
 // Pine emits full architecture-state JSON on every signal and tracks
-// nothing else. Jarvis (jarvis/app/parser.py) validates, classifies into
-// EXECUTE / CONTEXT / NOISE, speaks in its own voice, and — tap or auto —
-// executes on Deriv. Humans no longer read raw TRON output; Jarvis is the
-// only voice they hear. See jarvis/README.md for the receiving side.
+// nothing else. TradersMind (tradersmind/mind/router.py) validates,
+// classifies into EXECUTE / CONTEXT / NOISE, narrates, and — tap or auto —
+// executes on Deriv. Humans no longer read raw TRON output; TradersMind is
+// the only voice they hear. See tradersmind/README.md for the receiving side.
 // =========================================================================
 
 jstr(string s) =>

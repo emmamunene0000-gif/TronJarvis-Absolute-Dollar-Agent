@@ -25,19 +25,28 @@ tron:
     - "240"
 
 narrative:
+  # Keys are the TRON signal type, lowercased — mind/narrative.py looks up
+  # `signal.lower()` directly. Every one of the 18 signals needs an entry or
+  # it silently falls through to the generic fallback template.
   templates:
-    sovereign_call: "SOVEREIGN CALL — H4 flipped BULL. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
-    sovereign_put: "SOVEREIGN PUT — H4 flipped BEAR. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
-    mtf_call: "MTF FLIP CALL — M15/H1 trail flipped BULL. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
-    mtf_put: "MTF FLIP PUT — M15/H1 trail flipped BEAR. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
+    h4_flip_call: "SOVEREIGN CALL — H4 flipped BULL. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
+    h4_flip_put: "SOVEREIGN PUT — H4 flipped BEAR. All {sync_layers} layers aligned. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m. This is the highest conviction signal in the system."
+    mtf_flip_call: "MTF FLIP CALL — M15/H1 trail flipped BULL. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
+    mtf_flip_put: "MTF FLIP PUT — M15/H1 trail flipped BEAR. {sync_layers}/4 layers aligned. Confidence {confidence}%. Similar setups won {win_rate}% historically."
+    trail_flip_call: "TRAIL FLIP CALL — Chart trail flipped BULL with MTF support. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m."
+    trail_flip_put: "TRAIL FLIP PUT — Chart trail flipped BEAR with MTF support. Confidence {confidence}%. Strike {strike} {strike_mode}. Expiry {expiry}m."
     sniper_call: "SNIPER CALL — Zone retest confirmed. Price returned to broken resistance. Trail confirms BULL. Confidence {confidence}%."
     sniper_put: "SNIPER PUT — Zone retest confirmed. Price returned to broken support. Trail confirms BEAR. Confidence {confidence}%."
-    entry_call: "CALL ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
-    entry_put: "PUT ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
-    continuation_call: "CALL CONTINUATION — Momentum re-confirmed. RSI sustain BULL. Adding to bias."
-    continuation_put: "PUT CONTINUATION — Momentum re-confirmed. RSI sustain BEAR. Adding to bias."
-    regime_bull: "BULLISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for CALL setups."
-    regime_bear: "BEARISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for PUT setups."
+    call_entry: "CALL ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
+    put_entry: "PUT ENTRY — ATM trigger + confluence passed. Confidence {confidence}%. Strike {strike}. Expiry {expiry}m."
+    call_continuation: "CALL CONTINUATION — Momentum re-confirmed. RSI sustain BULL. Adding to bias."
+    put_continuation: "PUT CONTINUATION — Momentum re-confirmed. RSI sustain BEAR. Adding to bias."
+    call_zone_break: "CALL ZONE BREAK — Structural break with trail alignment BULL. Confidence {confidence}%. Context only — no independent trade."
+    put_zone_break: "PUT ZONE BREAK — Structural break with trail alignment BEAR. Confidence {confidence}%. Context only — no independent trade."
+    bull_regime_shift: "BULLISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for CALL setups."
+    bear_regime_shift: "BEARISH REGIME SHIFT — Structure broken. Trail flipped. VWAP confirms. Stand by for PUT setups."
+    bull_bos: "BULLISH BOS — Break of structure confirmed. Confidence modifier only."
+    bear_bos: "BEARISH BOS — Break of structure confirmed. Confidence modifier only."
 
 memory:
   similarity_features:
@@ -53,8 +62,26 @@ memory:
   knn_k: 5
 
 risk:
-  default_stake: 5.0
-  kelly_fraction: 0.25
+  min_stake: 0.35
+  max_dynamic_stake: 1.00
+  max_stake: 5.0
   max_leverage: 100
   min_confidence_for_auto: 85
   min_sync_layers_for_auto: 4
+
+router:
+  # Trading styles the operator has enabled. A signal whose best-fit style
+  # isn't enabled drops to a TAP card instead of auto-executing (CLAUDE.md §8).
+  enabled_styles:
+    - vanilla
+    - multiplier
+    - rise_fall
+  # Locked operator default (§8 open decision #1): fixed ranked list, first
+  # enabled style wins when a signal fits more than one.
+  style_priority:
+    - vanilla
+    - multiplier
+    - rise_fall
+
+governor:
+  demo_trades_required_for_live: 100

@@ -16,6 +16,7 @@ class TradeEpisode:
     id: Optional[int] = None
     timestamp: str = ""
     signal_type: str = ""
+    tier: str = "CONTEXT"          # EXECUTE | CONTEXT | NOISE (mind/router.py)
     bias: str = ""
     symbol: str = ""
     timeframe: str = ""
@@ -33,6 +34,9 @@ class TradeEpisode:
     expiry_min: int = 0
     entry_price: float = 0.0
     stake: float = 0.0
+    env: str = ""                  # demo | live | "" (not executed)
+    executed: bool = False         # True once a real order was placed
+    contract_id: str = ""
     result_pnl: Optional[float] = None
     result_status: str = "PENDING"  # PENDING, WIN, LOSS, EXPIRED
     exit_price: Optional[float] = None
@@ -65,6 +69,7 @@ class EpisodicMemory:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp TEXT NOT NULL,
                     signal_type TEXT NOT NULL,
+                    tier TEXT NOT NULL DEFAULT 'CONTEXT',
                     bias TEXT NOT NULL,
                     symbol TEXT NOT NULL,
                     timeframe TEXT NOT NULL,
@@ -82,6 +87,9 @@ class EpisodicMemory:
                     expiry_min INTEGER,
                     entry_price REAL,
                     stake REAL,
+                    env TEXT NOT NULL DEFAULT '',
+                    executed INTEGER NOT NULL DEFAULT 0,
+                    contract_id TEXT NOT NULL DEFAULT '',
                     result_pnl REAL,
                     result_status TEXT,
                     exit_price REAL,
@@ -105,36 +113,91 @@ class EpisodicMemory:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("""
                 INSERT INTO episodes (
-                    timestamp, signal_type, bias, symbol, timeframe, confidence,
+                    timestamp, signal_type, tier, bias, symbol, timeframe, confidence,
                     sync_layers, regime_quality, rsi, vwap_state, fib_state,
                     structure_bias, vp_position, atr, session_hour, strike,
-                    expiry_min, entry_price, stake, result_pnl, result_status,
-                    exit_price, exit_time, narrative, signal_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    expiry_min, entry_price, stake, env, executed, contract_id,
+                    result_pnl, result_status, exit_price, exit_time, narrative, signal_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                episode.timestamp, episode.signal_type, episode.bias, episode.symbol,
-                episode.timeframe, episode.confidence, episode.sync_layers,
+                episode.timestamp, episode.signal_type, episode.tier, episode.bias,
+                episode.symbol, episode.timeframe, episode.confidence, episode.sync_layers,
                 episode.regime_quality, episode.rsi, episode.vwap_state,
                 episode.fib_state, episode.structure_bias, episode.vp_position,
                 episode.atr, episode.session_hour, episode.strike, episode.expiry_min,
-                episode.entry_price, episode.stake, episode.result_pnl,
+                episode.entry_price, episode.stake, episode.env, int(episode.executed),
+                episode.contract_id, episode.result_pnl,
                 episode.result_status, episode.exit_price, episode.exit_time,
                 episode.narrative, episode.signal_json
             ))
             await db.commit()
             return cursor.lastrowid
 
-    async def update_result(self, episode_id: int, pnl: float, status: str, 
+    async def mark_executed(self, episode_id: int, env: str, contract_id: str):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                UPDATE episodes SET executed = 1, env = ?, contract_id = ?
+                WHERE id = ?
+            """, (env, contract_id, episode_id))
+            await db.commit()
+
+    async def update_result(self, episode_id: int, pnl: float, status: str,
                            exit_price: float, exit_time: str):
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
-                UPDATE episodes 
+                UPDATE episodes
                 SET result_pnl = ?, result_status = ?, exit_price = ?, exit_time = ?
                 WHERE id = ?
             """, (pnl, status, exit_price, exit_time, episode_id))
             await db.commit()
 
-    async def get_similar_episodes(self, symbol: str, signal_type: str, 
+    async def count_completed_trades(self, env: str = "demo") -> int:
+        """§10 demo-trade safety gate: count of real orders placed against
+        `env` that have settled (WIN/LOSS), not just signals seen."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                SELECT COUNT(*) FROM episodes
+                WHERE executed = 1 AND env = ? AND result_status IN ('WIN', 'LOSS')
+            """, (env,))
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+    async def recent_signals_same_bar(self, symbol: str, bar_time: int) -> List[str]:
+        """Every signal_type already logged for this symbol at this exact
+        TRON bar timestamp — used for same-bar flip-priority suppression."""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("""
+                SELECT signal_json FROM episodes
+                WHERE symbol = ? AND json_extract(signal_json, '$.time') = ?
+            """, (symbol, bar_time))
+            rows = await cursor.fetchall()
+            out = []
+            for (raw,) in rows:
+                try:
+                    out.append(json.loads(raw).get("signal", ""))
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+            return out
+
+    async def get_episode(self, episode_id: int) -> Optional[Dict[str, Any]]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("SELECT * FROM episodes WHERE id = ?", (episode_id,))
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def get_recent_trades(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Last N *executed* trades — for the /history glassbox read."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("""
+                SELECT * FROM episodes WHERE executed = 1
+                ORDER BY timestamp DESC LIMIT ?
+            """, (limit,))
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def get_similar_episodes(self, symbol: str, signal_type: str,
                                     limit: int = 5) -> List[TradeEpisode]:
         """Get recent similar episodes by symbol and signal type."""
         async with aiosqlite.connect(self.db_path) as db:
