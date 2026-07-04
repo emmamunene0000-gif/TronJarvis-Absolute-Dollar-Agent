@@ -1,56 +1,15 @@
-# TRON × JARVIS — Absolute Dollar Intelligence System
+# TRON — Operator's Guide to Reading the Alerts
 
-> *"The formula is simple. Analysis + Capital + Execution."*
+This is the human-readable companion to `TRON_Glassbox_SignalGenerator.pine`:
+signal hierarchy, the detection engines behind each alert, the trail-flip
+masterclass, and a per-alert-type action protocol. It documents TRON itself
+— it applies no matter what backend receives TRON's webhook.
 
----
-
-## The Vision
-
-Two entities. One organism.
-
-**TRON** is from Ares — the warrior on the grid. It lives on the price chart, written in Pine Script. It sees everything: trend, structure, momentum, liquidity, confidence. It does not trade. It detects and emits.
-
-**JARVIS** is from Iron Man — the intelligent operator. It lives in Python, connected to Telegram, Deriv API, and the Brain. It analyses, decides, communicates, and executes. Jarvis is Pinescript amplified — if you load TRON on a chart while Jarvis is running, they emit the same signal. That's the glass-box guarantee.
-
-The marriage of both is **Absolute Dollar Intelligence** — a system that sees what institutional traders see, communicates it in plain language, and executes with machine precision on Deriv Vanilla Options and Rise/Fall contracts.
-
----
-
-## The Architecture
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  TELEGRAM — Absolute Dollar Intelligence Channel                     │
-│  Native formatted alerts — no middleware, direct from TradingView    │
-│  Later: Jarvis briefings, tap-to-trade, mini web app                 │
-└────────────────────────┬─────────────────────────────────────────────┘
-                         │
-         ┌───────────────┴────────────────┐
-         │                                │
-┌────────▼────────┐              ┌────────▼──────────────────────────┐
-│  TRON           │              │  JARVIS                           │
-│  Pine Script v6 │              │  Python / LLM Brain               │
-│                 │              │                                   │
-│  Lives on the   │              │  • Market analysis (Deriv API)    │
-│  price grid     │              │  • Signal generation (Tron-parity)│
-│                 │              │  • Position ledger & risk gate    │
-│  Detects:       │              │  • Episodic memory                │
-│  • MTF Trend    │◄─ validates ─│  • LLM narrative (2-3 sentences)  │
-│  • Structure    │              │  • Telegram dispatch              │
-│  • RSI Momentum │              │  • Deriv API execution (future)   │
-│  • VWAP Regime  │              │  • MT5 bridge (future)            │
-│  • Fib Bands    │              │  • Tap-to-trade mini app (future) │
-│  • Volume Prof  │              │                                   │
-│  • Liquidity    │              │  Human-in-loop: Jarvis recommends,│
-│  • Trail Flips  │              │  operator approves, Deriv executes│
-│  • Confidence   │              └───────────────────────────────────┘
-│                 │
-│  Emits:         │
-│  Formatted      │
-│  Telegram alerts│
-│  (zero latency) │
-└─────────────────┘
-```
+For current architecture, doctrine, and build status, see `/CLAUDE.md`
+(the master spec) and `/tradersmind/README.md` (the deployed system). This
+file used to also describe the "JARVIS" execution backend that has since
+been superseded by `tradersmind/` — that material has been removed here to
+avoid two docs disagreeing about a system that no longer exists.
 
 ---
 
@@ -439,105 +398,22 @@ Alert format changes to:
 
 ---
 
-## Project Files
-
-Repo root — not nested under this folder:
+## Where This Fits in the Repo
 
 ```
-TRON_Glassbox_SignalGenerator.pine   ← TRON, ACTIVE v4.0 — the only Pine Script in this repo
-                                        STEP 17 emits JSON (engine=TRON_GBX_v3) into the
-                                        Jarvis webhook — no other alert path exists.
+TRON_Glassbox_SignalGenerator.pine   ← TRON — the only Pine Script in this repo.
+                                        Emits JSON (engine=TRON_GBX_v3) on every
+                                        signal in this doc's hierarchy.
 
-jarvis/                              ← JARVIS — ADI Execution Twin (Phase 1, built)
-├── README.md                        ← setup: server, .env, TradingView alert wiring
-├── requirements.txt
-├── .env.example
-└── app/
-    ├── main.py                      ← FastAPI spine — POST /webhook/tron, GET /ledger/*
-    ├── parser.py                    ← validates TRON JSON, classifies EXECUTE/CONTEXT/NOISE
-    ├── governor.py                  ← risk constitution — stake/loss/concurrency/auto gates
-    ├── voice.py                     ← Jarvis's plain-text chain-logic language
-    ├── deriv.py                     ← one WS pipeline: vanilla / rise_fall / multiplier
-    ├── telegram_bot.py              ← tap-to-trade cards + broadcast copy
-    └── db.py                        ← SQLite ledger — signals, trades, governor log
+tradersmind/                         ← The deployed system that receives TRON's
+                                        webhook, classifies/narrates/sizes/executes.
+                                        See tradersmind/README.md.
 
-TRON_JARVIS/
-└── README.md                        ← you are here — vision, signal hierarchy, operator masterclass
+CLAUDE.md                            ← Master build spec, doctrine, and the
+                                        verification/rebuild log.
 ```
 
----
-
-## The Formula
-
-```
-Analysis   → TRON sees it. Jarvis confirms it.
-Capital    → Deriv Vanilla Options (defined risk, no stop-hunt) — primary
-             Deriv Rise/Fall (pure direction, scalp speed)
-             Deriv Multipliers (leveraged, no expiry — replaces perpetuals; Bybit shelved)
-Execution  → Human-in-loop now. Autonomous later.
-```
-
----
-
-## Conversation Lock — The Origin Story
-
-> "Tron from Ares. And Jarvis from Iron Man. A Tron-Jarvis for trading vanilla options and perpetual futures. Tron needs to design itself first in Pinescript — that's the Tron version of itself. It lives on the price grid. Jarvis does market analysis, uses the Deriv API to extract data, researches opportunities based on the Tron architecture. Jarvis also executes and makes Tron smarter."
-
-> "The formula is simple. Analysis + Capital + Execution — our intraday momentum trading formula to success with risk management."
-
-> "Jarvis even its analysis is Pinescript amplified. If it sends a signal and you load the Pine agent we get the same thing. This way we have a system that's glass box and makes money."
-
-> "Do we have liquidity trail entries? Those are super entries and they guide the rest especially when it comes to exits and regime shifts, we can with confidence consider exits as well."
-
-> "The entries I meant were the liquidity trail flips — those are sniper flips for these options. The MTF trail flips would be perfect entries even for Rise and Fall."
-
----
-
-## Build Sequence
-
-- [x] Phase 0 — Glassbox signal generator (`TRON_Glassbox_SignalGenerator.pine`)
-  - [x] Stateless — all position tracking removed
-  - [x] 4-layer fractal sync (H4/H1/M15/M5)
-  - [x] Edge-detected regime shifts (no spam)
-  - [x] JSON webhook emitter (`engine: TRON_GBX_v3`) — Jarvis is the only voice humans hear
-  - [x] RR-based expiry formula (ATR velocity model, scalp-capped)
-  - [x] Regime strength scoring + quality tiers (SOVEREIGN/ALIGNED/MIXED/OPPOSED)
-  - [x] IV proxy + delta approximation
-  - [x] PnL tracker (last entry vs current price)
-  - [x] Signal deduplication ring buffer
-  - [x] Spatial confluence filter (optional)
-  - [x] Liquidity Zone Sniper Engine — break + retest detection
-  - [x] **MTF Trail Flip Sniper entries** — chart/M15/H1/H4 flip signals, tiered by TF
-  - [x] **SL/TP lines drawn on chart** — auto-drawn on every entry, persist until next entry
-  - [x] **Rise/Fall mode** — alert format + dashboard adapts, no strike needed
-  - [x] Cognitive dashboard (43 rows — full architecture state at a glance)
-  - [x] Operator masterclass (this README — how to act on every alert type)
-- [x] Phase 1 — Jarvis Execution Twin (Python, `jarvis/`)
-  - [x] FastAPI webhook receiver + SQLite ledger (signals, trades, governor log)
-  - [x] Parser + tier classifier (EXECUTE / CONTEXT / NOISE)
-  - [x] Risk Governor — stake cap, daily loss cap, concurrency cap, auto-only whitelist + confidence floor
-  - [x] Jarvis's Voice — plain-text signal cards, receipts, refusals, boot banner
-  - [x] Deriv execution pipeline — vanilla / rise_fall / multiplier, Bulk Purchase REST fast path
-  - [x] Telegram tap-to-trade (operator buttons + buttonless broadcast copy)
-  - [x] Demo/real hard switch (`DERIV_ENV`)
-  - [x] Auto-trader present but caged — off by default, whitelist + confidence-gated when on
-  - [x] Deployed to Replit (Reserved VM), first successful buy pending live test
-- [ ] Phase 1.5 — Deriv OAuth2 + PKCE (full API parity)
-  - **Why this exists:** Deriv retired the legacy WebSocket API for migrated accounts (confirmed via `GET /trading/v1/options/legacy/migration-status` → `"complete"`). Every `pat_` token failed `InvalidToken` against the old `wss://ws.derivws.com` endpoint regardless of app_id — that endpoint is simply gone for this account. The new API's single-account flow needs an interactive OAuth2 Authorization Code + PKCE login (`auth.deriv.com`) to get an access token, then a REST call for an OTP, then a WS URL. Personal Access Tokens still work, but only against the **Bulk Purchase** endpoint (direct buy, no quote, no balance, no status polling) — that's the fast path Phase 1 ships with today.
-  - [ ] PKCE login flow + `/oauth/callback` route in `main.py` (redirect_uri already registered on the Deriv app)
-  - [ ] Token storage + refresh (`expires_in` was 3600s in testing — confirm whether a `refresh_token` is issued)
-  - [ ] Swap `deriv.py` back to the OTP-authenticated WS flow: `proposal` (live quote) → `buy` → `proposal_open_contract` (settlement watching, restores WIN/LOSS receipts)
-  - [ ] `balance`/`portfolio` calls for real account-state checks on boot and `/status`
-- [ ] Phase 2 — Jarvis Brain, deepened
-  - [ ] Watchlist twin — TRON math re-derived server-side over Deriv candle streams (multi-asset scanning)
-  - [ ] LLM narrative generation (Claude API) — voice.py is deterministic templates today, not LLM-authored
-  - [ ] Episodic memory beyond the SQL ledger (pattern recall across sessions)
-  - [ ] Session filters in the Governor (time-of-day gating)
-- [ ] Phase 3 — Real money
-  - [ ] Confirm symbol map + demo ledger clean for ≥1 week
-  - [ ] Flip `DERIV_ENV=real`, same code path
-  - [ ] Auto-trader graduates from demo-only once its ledger earns it
-- [ ] Phase 4 — Commercial skin
-  - [ ] Telegram Mini App (tap-to-trade UI, ledger read API already exposed)
-  - [ ] Affiliate / Operator tiers for the Beta channel
-  - [ ] (Bybit is shelved — Deriv Multipliers cover the perpetuals use case, one broker only)
+Build status, architecture, and doctrine live in `/CLAUDE.md` and
+`/tradersmind/README.md` now — this file stays scoped to what TRON's alerts
+mean and how to act on them, so it doesn't drift out of sync with whichever
+backend is deployed.

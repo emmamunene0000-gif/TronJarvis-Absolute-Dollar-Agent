@@ -496,3 +496,38 @@ co-occurring EXECUTE signal, the LightGBM edge model, and the OAuth2+PKCE
 Deriv upgrade (balance checks, live quotes, settlement watching). These are
 later build-sequence phases (§17), not doctrine violations, and weren't
 invented or faked to look done.
+
+---
+
+## 22. Purge (2026-07-04, same day) — jarvis/ and jarvis-era docs removed
+
+Operator decision: purge now, before the first Replit deployment, rather
+than waiting for a confirmed live demo trade through `tradersmind/` first
+(the original plan in §21). Recoverable from git history if anything here
+turns out to be needed.
+
+- **`jarvis/` deleted entirely** — its classifier and Deriv-bridge logic was
+  already ported into `tradersmind/` in §21; nothing in it was still load-bearing.
+- **`SYSTEM_DIAGNOSTIC.md` deleted** — a session-specific jarvis bug log;
+  the facts that still matter (the Deriv legacy-API retirement, the
+  `underlying_symbol` field-name fix) are already captured in §20 above and
+  in `tradersmind/bridge/deriv_client.py`'s docstring.
+- **`TRON_JARVIS/README.md` kept, de-referenced** — its signal hierarchy,
+  detection-engine table, trail-flip masterclass, and per-alert-type
+  operator protocol describe TRON itself, not jarvis's code, so it wasn't
+  "not to be used" the way jarvis/'s code was. Cut instead: the "Two
+  entities, one organism" vision section (described an LLM-narrated,
+  MT5-bridged Jarvis that doctrine explicitly forbids — zero LLM in the
+  narrator, Deriv only, no third-party bridges), the Project Files listing
+  of jarvis/'s file tree, and the Build Sequence checklist tracking jarvis's
+  phases. Replaced with short pointers to `/CLAUDE.md` and
+  `/tradersmind/README.md` so build status lives in exactly one place.
+- **`TRON_Glassbox_SignalGenerator.pine`'s STEP 17 comment block** updated
+  to name TradersMind instead of Jarvis and stop pointing at deleted
+  `jarvis/app/parser.py` / `jarvis/README.md` paths. Comment-only change —
+  no detection logic touched, per §18's guardrail.
+- `.gitignore`'s dead `jarvis/jarvis.db` line removed; root `README.md`
+  rewritten to describe TradersMind as the system, not Jarvis, with a note
+  that `jarvis/` is recoverable from history.
+- `.replit` was already pointed at `tradersmind/` from §21 — unaffected by
+  this purge.

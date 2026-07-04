@@ -27,9 +27,10 @@ TRON has no idea what account it's trading, what already happened, or what a dol
 |---|---|
 | `TRON_Glassbox_SignalGenerator.pine` | TRON — the only Pine Script in this repo. Load this on TradingView. |
 | `tradersmind/` | **The deployed system.** Layered `tron/mind/bridge/governor/body/face` build — see `tradersmind/README.md` to run it. `.replit` points here. |
-| `jarvis/` | Superseded flat-layout build. Its classifier/Deriv-bridge logic was ported into `tradersmind/`; kept until a real demo trade is confirmed through `tradersmind/`, then retired. |
-| `TRON_JARVIS/README.md` | Historical deep dive on the jarvis-era build — signal hierarchy, alert-type playbook, dashboard reference. |
+| `TRON_JARVIS/README.md` | Operator's guide to TRON's alerts — signal hierarchy, how to read every alert type, dashboard reference. |
 | `CLAUDE.md` | The master build spec and its verification/rebuild log — read this first. |
+
+The earlier `jarvis/` build (flat layout, proved the Deriv Bulk Purchase execution path) has been purged — its classifier and Deriv-bridge logic was already ported into `tradersmind/` (see `CLAUDE.md` §21). It's still recoverable from git history if needed.
 
 ## Status
 
