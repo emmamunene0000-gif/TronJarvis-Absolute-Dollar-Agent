@@ -9,6 +9,13 @@ from datetime import datetime, timedelta
 
 @dataclass
 class RiskProfile:
+    # Sizing law (§10): stake is sized dynamically inside this band, scaled
+    # by confidence/edge. It is NOT a limit check — it's what the Governor
+    # actually charges per trade.
+    min_stake: float = 0.35
+    max_dynamic_stake: float = 1.00
+    # Hard ceiling — never exceeded regardless of what the sizing law above
+    # computes. Nests around the sizing law, doesn't compete with it.
     max_stake: float = 5.0
     daily_loss_limit: float = 50.0
     max_consecutive_losses: int = 3
@@ -36,9 +43,10 @@ class RiskGovernor:
         self.session_start: datetime = datetime.utcnow()
         self.overrides: list = []
 
-    def check_pre_trade(self, signal: Dict[str, Any], 
+    def check_pre_trade(self, signal: Dict[str, Any],
                         balance: float,
-                        mode: str = "manual") -> Tuple[bool, str, float]:
+                        mode: str = "manual",
+                        edge_win_rate: Optional[float] = None) -> Tuple[bool, str, float]:
         """
         Pre-trade risk check.
         Returns: (approved, reason, adjusted_stake)
@@ -68,27 +76,32 @@ class RiskGovernor:
             if sync < self.profile.min_sync_layers_for_auto:
                 return False, f"AUTO_SYNC: Sync {sync}/4 < {self.profile.min_sync_layers_for_auto}/4", 0.0
 
-        # 5. Stake sizing
-        base_stake = self.profile.max_stake
-
-        # Kelly Criterion Lite adjustment
-        if self.daily_trades > 0:
-            win_rate = self.daily_wins / self.daily_trades
-            if win_rate > 0.55:
-                base_stake = min(base_stake * 1.2, balance * 0.05)  # Max 5% of balance
-            elif win_rate < 0.4:
-                base_stake = base_stake * 0.75
-
-        # Heat check — reduce size if recent volatility high
-        if abs(self.daily_pnl) > balance * (self.profile.heat_threshold_percent / 100):
-            base_stake = base_stake * 0.5
-            return True, "HEAT_REDUCED: High volatility detected, stake halved", base_stake
-
-        # 6. Time between trades (anti-spam)
+        # 5. Time between trades (anti-spam)
         if self.last_trade_time and (now - self.last_trade_time).seconds < 30:
             return False, "RATE_LIMIT: Minimum 30 seconds between trades", 0.0
 
-        return True, "APPROVED", round(base_stake, 2)
+        # 6. Sizing law (§10): stake scales between min_stake and
+        # max_dynamic_stake by TRON's confidence and, once available, the
+        # memory model's edge signal (historical win rate of similar setups).
+        # This is the Governor sizing for edge, not picking a flat number.
+        band = self.profile.max_dynamic_stake - self.profile.min_stake
+        confidence_score = max(0.0, min(1.0, conf / 100))
+        edge_score = confidence_score if edge_win_rate is None else \
+            (confidence_score + max(0.0, min(1.0, edge_win_rate))) / 2
+        stake = self.profile.min_stake + edge_score * band
+
+        # Heat check — reduce size if recent volatility high (still inside the band)
+        heat_reduced = abs(self.daily_pnl) > balance * (self.profile.heat_threshold_percent / 100)
+        if heat_reduced:
+            stake = max(self.profile.min_stake, stake * 0.5)
+
+        # Hard ceiling — never exceeded regardless of sizing law output
+        stake = min(stake, self.profile.max_stake, balance * 0.10)
+
+        if heat_reduced:
+            return True, "HEAT_REDUCED: High volatility detected, stake reduced", round(stake, 2)
+
+        return True, "APPROVED", round(stake, 2)
 
     def record_trade(self, stake: float, result_pnl: float, 
                      signal_type: str, timestamp: datetime = None):
@@ -145,13 +158,15 @@ class RiskGovernor:
                          "WARM" if abs(self.daily_pnl) < self.profile.daily_loss_limit * 0.7 else "HOT"
         }
 
-    def operator_override(self, reason: str) -> Dict[str, Any]:
+    def operator_override(self, reason: str, operator_id: str) -> Dict[str, Any]:
         """
         Operator override — logs the override but allows trade.
-        USE WITH CAUTION. This is your money.
+        USE WITH CAUTION. This is your money. §18: every override must be
+        logged with operator ID and timestamp — never silently bypassed.
         """
         override_record = {
             "timestamp": datetime.utcnow().isoformat(),
+            "operator_id": operator_id,
             "reason": reason,
             "daily_pnl_at_override": self.daily_pnl,
             "consecutive_losses_at_override": self.consecutive_losses
@@ -162,3 +177,12 @@ class RiskGovernor:
             "warning": "OVERRIDE ACTIVE — Risk limits bypassed. Proceed with caution.",
             "record": override_record
         }
+
+
+def can_unlock_live_mode(completed_demo_trades: int, required: int = 100) -> bool:
+    """
+    §10 demo-trade safety gate: TRADING_MODE=live cannot be unlocked until
+    `required` completed demo-account trades are logged in episodic memory.
+    Hard gate, no override.
+    """
+    return completed_demo_trades >= required

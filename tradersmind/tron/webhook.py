@@ -2,7 +2,7 @@
 FastAPI Webhook Endpoint for TRON
 Receives, validates, queues, and broadcasts signals.
 """
-from fastapi import APIRouter, Request, HTTPException, Header, Depends
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
 from typing import Optional
 import asyncio
@@ -33,19 +33,17 @@ def get_validator() -> TronValidator:
 @router.post("/tron")
 async def receive_tron_signal(
     request: Request,
-    x_signature: Optional[str] = Header(None, alias="X-TRON-Signature"),
+    key: str = Query(""),
     validator: TronValidator = Depends(get_validator)
 ):
     """
     Primary endpoint for TRON Pine Script webhook.
-    TradingView Alert Message: {{alert_message}}
+    CLAUDE.md §6: POST /webhook/tron?key=SECRET — TradingView Alert Message: {{alert_message}}
     """
-    body = await request.body()
+    if key != validator.secret:
+        raise HTTPException(status_code=403, detail="bad key")
 
-    # Signature verification (optional in dev, required in prod)
-    if os.getenv("VERIFY_SIGNATURE", "false").lower() == "true":
-        if not x_signature or not validator.verify_signature(body, x_signature):
-            raise HTTPException(status_code=401, detail="Invalid signature")
+    body = await request.body()
 
     try:
         raw = json.loads(body)

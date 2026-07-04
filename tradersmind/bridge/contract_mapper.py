@@ -37,14 +37,15 @@ class ContractMapper:
         direction = signal.get("bias", "CALL")
 
         if mode == "rise_fall":
-            # Rise/Fall: direction + duration only
+            # Rise/Fall: direction + duration only. TRON's expiry_min is
+            # already in minutes — Deriv's rise/fall duration_unit is "m".
             return ContractParams(
                 contract_type="rise_fall",
                 symbol=symbol,
                 direction=direction,
                 stake=stake,
                 duration=setup.get("expiry_min", 5),
-                duration_unit="t" if setup.get("expiry_min", 5) <= 10 else "m"
+                duration_unit="m"
             )
 
         elif mode == "vanilla":

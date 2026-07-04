@@ -58,6 +58,7 @@ class LogicTrace:
             "{bias} signal detected. Confidence {confidence}%. Sync {sync_layers}/4.")
 
         headline = template.format(
+            bias=bias,
             sync_layers=sync,
             confidence=conf,
             strike=strike,

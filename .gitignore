@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 .env
 jarvis/jarvis.db
+tradersmind/tradersmind.db
+.pytest_cache/

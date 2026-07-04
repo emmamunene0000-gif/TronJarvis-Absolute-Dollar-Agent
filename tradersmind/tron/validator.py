@@ -2,9 +2,6 @@
 TRON Payload Validator & Gatekeeper
 Ensures only clean, expected signals enter the system.
 """
-import json
-import hmac
-import hashlib
 from typing import Optional, Tuple
 from tron.models import TronSignal, SignalEnvelope
 
@@ -13,15 +10,6 @@ class TronValidator:
         self.secret = webhook_secret
         self.allowed_pairs = set(allowed_pairs)
         self.allowed_tfs = set(allowed_timeframes)
-
-    def verify_signature(self, body: bytes, signature: str) -> bool:
-        """Verify HMAC-SHA256 signature from TradingView webhook."""
-        expected = hmac.new(
-            self.secret.encode(),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-        return hmac.compare_digest(expected, signature)
 
     def validate_payload(self, raw_json: dict) -> Tuple[bool, Optional[SignalEnvelope], str]:
         """

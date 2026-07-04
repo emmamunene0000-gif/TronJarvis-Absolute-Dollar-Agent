@@ -196,7 +196,7 @@
             <div style="color: #6b7280; font-size: 12px; margin-top: 4px;">Just a Really Very Intelligent Sidekick</div>
         </div>
         <div style="display: flex; gap: 12px; align-items: center;">
-            <span class="badge">📊 PAPER MODE</span>
+            <span class="badge" id="mode-badge">—</span>
             <span class="badge" style="background: #1e3a2f;">🟢 ACTIVE</span>
         </div>
     </div>
@@ -272,6 +272,10 @@
     </div>
 
     <script>
+        fetch('/api/status').then(r => r.json()).then(s => {
+            document.getElementById('mode-badge').textContent = `\u{1F4CA} ${s.mode} MODE`;
+        });
+
         const ws = new WebSocket(`ws://${window.location.host}/ws`);
 
         ws.onmessage = (event) => {

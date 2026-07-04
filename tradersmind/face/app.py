@@ -2,6 +2,7 @@
 TradersMind Web Dashboard
 Lightweight, real-time, embedded TradingView chart.
 """
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -33,7 +34,7 @@ async def dashboard(request: Request):
 async def api_status():
     return {
         "status": "running",
-        "mode": "PAPER",
+        "mode": os.getenv("TRADING_MODE", "demo").upper(),
         "active_signals": len(active_signals),
         "active_trades": len(active_tickets),
         "total_trades": len(trade_history),

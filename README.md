@@ -1,8 +1,8 @@
-# Absolute Dollar Intelligence — TRON / JARVIS
+# Absolute Dollar Agent — TRON / TradersMind
 
-A glassbox trading system for Deriv. **TRON** detects on the price grid in Pine Script and emits nothing but signal. **JARVIS** receives, classifies, speaks, and executes — with a human tap today, autonomously later, always under a risk governor.
+A glassbox trading system for Deriv. **TRON** detects on the price grid in Pine Script and emits nothing but signal. **TradersMind** receives, classifies, narrates, remembers, and executes — with a human tap today, autonomously later, always under a risk governor.
 
-No blackbox. Every signal Jarvis acts on can be traced back to the exact TRON filters that fired.
+No blackbox. Every signal TradersMind acts on can be traced back to the exact TRON filters that fired.
 
 ## Architecture
 
@@ -10,35 +10,37 @@ No blackbox. Every signal Jarvis acts on can be traced back to the exact TRON fi
 TradingView (TRON, Premium)
         │  JSON webhook — engine: TRON_GBX_v3
         ▼
-JARVIS (FastAPI)  →  SQLite Ledger (signals, trades, governor log)
+TradersMind (FastAPI) → mind/router classifies EXECUTE/CONTEXT/NOISE
+        │                → SQLite episodic memory (signals, trades, governor log)
+        ▼
+Telegram — tap-to-execute cards + status/risk/history
         │
         ▼
-Telegram — Jarvis's voice + Tap-to-Trade buttons
-        │
-        ▼
-Deriv WebSocket API — Vanilla Options (primary) / Rise-Fall / Multipliers, demo or real
+Deriv Bulk Purchase REST — Vanilla Options / Rise-Fall / Multipliers, demo or live
 ```
 
-TRON has no idea what account it's trading, what already happened, or what a dollar is — it only reads price, one asset at a time, and says so. JARVIS is the only thing that knows about capital, risk, and history. That split is deliberate: it's what keeps TRON simple enough to trust and JARVIS smart enough to be worth building.
+TRON has no idea what account it's trading, what already happened, or what a dollar is — it only reads price, one asset at a time, and says so. TradersMind is the only thing that knows about capital, risk, and history. That split is deliberate: it's what keeps TRON simple enough to trust and TradersMind smart enough to be worth building.
 
 ## What's in this repo
 
 | Path | What it is |
 |---|---|
-| `TRON_Glassbox_SignalGenerator.pine` | TRON, v4.0 — the only Pine Script in this repo. Load this on TradingView. |
-| `jarvis/` | JARVIS Phase 1 — FastAPI server, Deriv execution, Telegram tap-to-trade. See `jarvis/README.md` to run it. |
-| `TRON_JARVIS/README.md` | The deep dive — signal hierarchy, how to act on every alert type, dashboard reference, operator masterclass. |
+| `TRON_Glassbox_SignalGenerator.pine` | TRON — the only Pine Script in this repo. Load this on TradingView. |
+| `tradersmind/` | **The deployed system.** Layered `tron/mind/bridge/governor/body/face` build — see `tradersmind/README.md` to run it. `.replit` points here. |
+| `jarvis/` | Superseded flat-layout build. Its classifier/Deriv-bridge logic was ported into `tradersmind/`; kept until a real demo trade is confirmed through `tradersmind/`, then retired. |
+| `TRON_JARVIS/README.md` | Historical deep dive on the jarvis-era build — signal hierarchy, alert-type playbook, dashboard reference. |
+| `CLAUDE.md` | The master build spec and its verification/rebuild log — read this first. |
 
 ## Status
 
-TRON's detection engine and Jarvis's execution twin are both built. What's not done yet is deploying Jarvis somewhere TradingView's webhook can reach it, and running it against a Deriv demo account long enough to trust it. See `TRON_JARVIS/README.md` → Build Sequence for the full phase-by-phase status.
+Nothing is live yet. TRON's detection engine is finished and unmodified. `tradersmind/` has the full pipeline (classify → narrate → remember → size → route) working end-to-end against a mocked Deriv client and passing its test suite, but has **not** placed a confirmed real order — that requires deploying it with real Deriv/Telegram credentials. See `CLAUDE.md` §21 for exactly what was rebuilt and what's still a known gap.
 
 ## Quickstart
 
 1. Load `TRON_Glassbox_SignalGenerator.pine` on a TradingView chart (Premium plan, for reliable webhooks).
-2. Stand up Jarvis: follow `jarvis/README.md` (server, `.env`, the one TradingView alert you need).
-3. Point the alert's webhook at your running Jarvis instance.
-4. Start on `DERIV_ENV=demo`, `AUTO_TRADE=false` — tap-to-trade only until the ledger earns more.
+2. Stand up TradersMind: follow `tradersmind/README.md` (server, `.env`, the one TradingView alert you need).
+3. Point the alert's webhook at your running instance: `https://your-host/webhook/tron?key=SECRET`.
+4. Start on `TRADING_MODE=demo`, `AUTO_EXECUTE=false` — tap-to-trade only until the ledger earns more (100 completed demo trades before `live` unlocks at all).
 
 ## Broker & contracts
 
