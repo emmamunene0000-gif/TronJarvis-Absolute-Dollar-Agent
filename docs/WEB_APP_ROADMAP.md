@@ -1,7 +1,18 @@
-## Web app foundation
+## Stage 1 — live data and durable dashboard read models
 
-A Next.js App Router dashboard is being developed under `web/`. It currently consumes the existing Python status, signal, and trade endpoints through a rewrite proxy and presents explicit empty states when the backend or market candle provider is unavailable. The chart renderer is wired for real OHLC candles plus signal markers; no sample market data is shown.
+- Added a bounded, public Deriv historical-candle adapter (no trading token is sent) and a validated candle API at `/api/market/candles`.
+- Replaced dashboard API's process-local signal/trade view with SQLite-backed signal and trade reads, and exposed the current risk state.
+- Updated the Next.js chart to consume the candle endpoint, map TRON millisecond timestamps to candle seconds, and skip markers that cannot be aligned to available bars. UI refresh is throttled to 15 seconds to avoid excessive market-data requests.
+- Execution remains disabled in the web UI. Authenticated order APIs, real balance validation, persistent order events, settlement reconciliation, and Paper mode are subsequent stages; no claim of completion is made yet.
 
-Execution controls remain disabled in the web client. Backend authentication, demo order confirmation, persistent order reconciliation, and settlement data must be completed and tested before enabling an order UI. The Pine Script remains the signal source of truth while any PineTS migration is validated for parity.
+Verify locally:
 
-Start the frontend with `cd web && npm install && npm run dev`; run the Python backend separately as documented in `absolute_dollar_agent/README.md`.
+```bash
+cd absolute_dollar_agent
+pip install -r requirements.txt
+pytest -q
+cd ../web
+npm install
+npm run typecheck
+npm run build
+```

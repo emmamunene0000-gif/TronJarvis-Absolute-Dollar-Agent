@@ -10,7 +10,6 @@ export default function PriceChart({ candles, signals }: { candles: Candle[]; si
   const host = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
-
   useEffect(() => {
     if (!host.current) return;
     const chart = createChart(host.current, {
@@ -21,34 +20,27 @@ export default function PriceChart({ candles, signals }: { candles: Candle[]; si
       timeScale: { borderColor: "#30372e", timeVisible: true, secondsVisible: false },
       crosshair: { vertLine: { color: "#b3e65a55" }, horzLine: { color: "#b3e65a55" } },
     });
-    const series = chart.addCandlestickSeries({
-      upColor: "#b3e65a", downColor: "#ed705e", borderVisible: false,
-      wickUpColor: "#b3e65a", wickDownColor: "#ed705e",
-    });
+    const series = chart.addCandlestickSeries({ upColor: "#b3e65a", downColor: "#ed705e", borderVisible: false, wickUpColor: "#b3e65a", wickDownColor: "#ed705e" });
     chartRef.current = chart;
     seriesRef.current = series;
     const resize = new ResizeObserver(() => chart.timeScale().fitContent());
     resize.observe(host.current);
     return () => { resize.disconnect(); chart.remove(); chartRef.current = null; seriesRef.current = null; };
   }, []);
-
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !candles.length) return;
     const sorted = [...candles].sort((a, b) => a.time - b.time);
     series.setData(sorted.map((c): CandlestickData<Time> => ({ time: c.time as Time, open: c.open, high: c.high, low: c.low, close: c.close })));
-    const markers: SeriesMarker<Time>[] = signals
-      .filter(s => Number.isFinite(s.time) && Number.isFinite(s.spot))
-      .map(s => ({
-        time: s.time as Time,
-        position: s.bias === "CALL" ? "belowBar" : "aboveBar",
-        color: s.bias === "CALL" ? "#b3e65a" : "#ed705e",
-        shape: s.bias === "CALL" ? "arrowUp" : "arrowDown",
-        text: `${s.signal} ${s.confidence}%`,
-      }));
+    const candleTimes = new Set(sorted.map(c => c.time));
+    const markers: SeriesMarker<Time>[] = signals.filter(s => Number.isFinite(s.time) && Number.isFinite(s.spot)).flatMap(s => {
+      // TRON JSON emits Unix milliseconds; Lightweight Charts requires Unix seconds.
+      const seconds = Math.floor(s.time / 1000);
+      const candleTime = Math.floor(seconds / 300) * 300;
+      if (!candleTimes.has(candleTime)) return [];
+      return [{ time: candleTime as Time, position: s.bias === "CALL" ? "belowBar" : "aboveBar", color: s.bias === "CALL" ? "#b3e65a" : "#ed705e", shape: s.bias === "CALL" ? "arrowUp" : "arrowDown", text: `${s.signal} ${s.confidence}%` }];
+    });
     series.setMarkers(markers);
-    chartRef.current?.timeScale().fitContent();
   }, [candles, signals]);
-
   return <div ref={host} className="chart-canvas" aria-label="Market candlestick chart" />;
 }
