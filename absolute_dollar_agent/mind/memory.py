@@ -76,18 +76,46 @@ class EpisodicMemory:
             await db.execute("CREATE INDEX IF NOT EXISTS idx_symbol ON episodes(symbol)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_result ON episodes(result_status)")
             await db.execute("CREATE INDEX IF NOT EXISTS idx_contract ON episodes(contract_id)")
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS operator_requests (
+                    idempotency_key TEXT PRIMARY KEY,
+                    episode_id INTEGER NOT NULL,
+                    style TEXT NOT NULL,
+                    env TEXT NOT NULL,
+                    contract_id TEXT,
+                    status TEXT NOT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            await db.commit()
+
+    async def reserve_request(self, idempotency_key: str, episode_id: int, style: str, env: str) -> dict:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            now = datetime.utcnow().isoformat()
+            existing = await db.execute("SELECT * FROM operator_requests WHERE idempotency_key = ?", (idempotency_key,))
+            row = await existing.fetchone()
+            if row:
+                return dict(row)
+            await db.execute("INSERT INTO operator_requests (idempotency_key, episode_id, style, env, contract_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, '', 'PENDING', ?, ?)", (idempotency_key, episode_id, style, env, now, now))
+            await db.commit()
+            return {"idempotency_key": idempotency_key, "episode_id": episode_id, "style": style, "env": env, "contract_id": "", "status": "PENDING", "created_at": now, "updated_at": now}
+
+    async def complete_request(self, idempotency_key: str, contract_id: str, status: str = "COMPLETED"):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("UPDATE operator_requests SET contract_id = ?, status = ?, updated_at = ? WHERE idempotency_key = ?", (contract_id, status, datetime.utcnow().isoformat(), idempotency_key))
             await db.commit()
 
     async def store_signal(self, episode: TradeEpisode) -> int:
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("""
-                INSERT INTO episodes (
-                    timestamp, signal_type, tier, bias, symbol, timeframe, confidence,
-                    sync_layers, regime_quality, rsi, vwap_state, fib_state,
+                INSERT INTO episodes (timestamp, signal_type, tier, bias, symbol, timeframe,
+                    confidence, sync_layers, regime_quality, rsi, vwap_state, fib_state,
                     structure_bias, vp_position, atr, session_hour, strike, expiry_min,
                     entry_price, stake, env, executed, contract_id, result_pnl,
-                    result_status, exit_price, exit_time, narrative, signal_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    result_status, exit_price, exit_time, narrative, signal_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 episode.timestamp, episode.signal_type, episode.tier, episode.bias,
                 episode.symbol, episode.timeframe, episode.confidence, episode.sync_layers,
