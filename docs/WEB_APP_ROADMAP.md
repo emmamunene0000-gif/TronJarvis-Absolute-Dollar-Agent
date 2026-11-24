@@ -1,7 +1,5 @@
-## Web app foundation
+## Current build status
 
-A Next.js App Router dashboard is being developed under `web/`. It currently consumes the existing Python status, signal, and trade endpoints through a rewrite proxy and presents explicit empty states when the backend or market candle provider is unavailable. The chart renderer is wired for real OHLC candles plus signal markers; no sample market data is shown.
+The web-console branch includes a Next.js dashboard foundation, Deriv historical candles, SQLite-backed signal/trade read models, and early operator-request/paper abstractions. The following items are **not yet production-complete**: end-to-end authenticated order controls, real Deriv balance verification, reliable settlement/restart reconciliation, a persistent paper ledger, complete front-end controls/tests, and verified CI/deployment. Do not enable unattended or live execution based on the dashboard scaffold alone.
 
-Execution controls remain disabled in the web client. Backend authentication, demo order confirmation, persistent order reconciliation, and settlement data must be completed and tested before enabling an order UI. The Pine Script remains the signal source of truth while any PineTS migration is validated for parity.
-
-Start the frontend with `cd web && npm install && npm run dev`; run the Python backend separately as documented in `absolute_dollar_agent/README.md`.
+The original signal doctrine remains authoritative: TRON emits signals; the application may classify, explain, size and execute them but must not synthesize signals.
